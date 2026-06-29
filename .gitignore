@@ -1,0 +1,43 @@
+# Production Agent Project
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Environment
+.env
+.env*.local
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code internal
+.superpowers/
+
+# Generated
+src/generated/
+
+# Docs (optional)
+docs/superpowers/

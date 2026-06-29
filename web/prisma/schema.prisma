@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Base {
+  id                    String             @id @default(cuid())
+  name                  String
+  location              String
+  machineCount          Int                @map("machine_count")
+  perMachineDailyOutput Int                @map("per_machine_daily_output")
+  active                Boolean            @default(true)
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+  snapshots             CapacitySnapshot[]
+  conversations         Conversation[]
+
+  @@map("bases")
+}
+
+model CapacitySnapshot {
+  id             String   @id @default(cuid())
+  baseId         String   @map("base_id")
+  base           Base     @relation(fields: [baseId], references: [id])
+  pendingOrders  Int      @map("pending_orders")
+  dailyCapacity  Int      @map("daily_capacity")
+  loadRate       Float    @map("load_rate")
+  overloadMultiplier Float @map("overload_multiplier")
+  daysToComplete Float   @map("days_to_complete")
+  snapshotDate   DateTime @map("snapshot_date")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("capacity_snapshots")
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  baseId    String?   @map("base_id")
+  base      Base?     @relation(fields: [baseId], references: [id])
+  userId    String    @map("user_id")
+  title     String?
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  messages  Message[]
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String       @map("conversation_id")
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String       // user, assistant, tool
+  content        String
+  toolCalls      String?      @map("tool_calls") // JSON string
+  toolResults    String?      @map("tool_results") // JSON string
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@map("messages")
+}
