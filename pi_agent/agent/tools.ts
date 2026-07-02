@@ -37,8 +37,8 @@ export const queryOrderProgressTool = defineTool({
   label: "查询订单进度",
   description:
     "从 SQL Server 查询指定订单的真实生产进度（负责人、各工序时间、异常信息等）。" +
-    `支持 4 个基地: ${ALL_BASE_NAMES.join(" / ")}。` +
-    "如未指定 base，将并行查询全部 4 个基地并返回命中的那个。",
+    `支持 4 个业务范围: ${ALL_BASE_NAMES.join(" / ")}。` +
+    "如未指定 base，将并行查询全部 4 个业务范围并返回命中的那个。",
   parameters: Type.Object({
     order_no: Type.String({ description: "订单编号" }),
     base: Type.Optional(
@@ -47,9 +47,9 @@ export const queryOrderProgressTool = defineTool({
           Type.Literal("中试广州"),
           Type.Literal("小试"),
           Type.Literal("中试上海"),
-          Type.Literal("中试天津"),
+          Type.Literal("OA辅助单"),
         ],
-        { description: `基地名称，可选。不传则并行查询 4 个基地: ${ALL_BASE_NAMES.join(", ")}` },
+        { description: `业务范围名称，可选。不传则并行查询 4 个业务范围: ${ALL_BASE_NAMES.join(", ")}` },
       ),
     ),
   }),

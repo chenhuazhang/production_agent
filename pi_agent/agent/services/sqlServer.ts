@@ -73,16 +73,16 @@ export async function getPool(): Promise<sql.ConnectionPool> {
     },
   })
     .connect()
-    .then((pool) => {
+    .then((pool: sql.ConnectionPool) => {
       _pool = pool;
       _connecting = null;
-      pool.on("error", (err) => {
+      pool.on("error", (err: Error) => {
         console.error("[sqlServer] pool error:", err);
         _pool = null;
       });
       return pool;
     })
-    .catch((err) => {
+    .catch((err: Error) => {
       _connecting = null;
       throw err;
     });
@@ -102,9 +102,9 @@ export async function closePool(): Promise<void> {
 // 基地标识
 // ============================================
 
-export type BaseName = "中试广州" | "小试" | "中试上海" | "中试天津";
+export type BaseName = "中试广州" | "小试" | "中试上海" | "OA辅助单";
 
-export const ALL_BASE_NAMES: BaseName[] = ["中试广州", "小试", "中试上海", "中试天津"];
+export const ALL_BASE_NAMES: BaseName[] = ["中试广州", "小试", "中试上海", "OA辅助单"];
 
 // ============================================
 // SQL 模板（每个基地一套）
@@ -181,9 +181,7 @@ CROSS JOIN (
         MAX(CASE WHEN f53444 = '最终班长' THEN f53443 END) AS 最终班长,
         MAX(CASE WHEN f53444 = '排产'     THEN f53443 END) AS 排产完成人员
     FROM tabdiytable3439
-    WHERE ID = '342019838'
-      AND f136277 = @base
-      AND f53444 IN ('混料', '挤出', '注塑', '最终班长', '排产')
+    WHERE f53444 IN ('混料', '挤出', '注塑', '最终班长', '排产')
 ) p
 WHERE t.f102935 = @orderNo`;
 
@@ -228,8 +226,8 @@ CROSS JOIN (
 ) p
 WHERE t2.f96425 = @orderNo`;
 
-// 第 4 个 SQL：用户未明确标注基地名，暂命名为"中试天津"，可在 ALL_BASE_NAMES 中改名
-const SQL_ZHONGSHI_TIANJIN = `
+// OA辅助单（全集团）：跨基地范围，仅注塑工序，字段较少
+const SQL_OA_ASSIST = `
 SELECT DISTINCT
     t.f138799 AS order_no,
     t.f138800 AS machine,
@@ -245,9 +243,7 @@ CROSS JOIN (
         MAX(CASE WHEN f53444 = '注塑' THEN f53443 END) AS 排产完成人员,
         MAX(CASE WHEN f53444 = '注塑' THEN f53443 END) AS 最终班长
     FROM tabdiytable3439
-    WHERE ID = '342019838'
-      AND f136277 = @base
-      AND f53444 IN ('注塑')
+    WHERE f53444 IN ('注塑')
 ) p
 WHERE t.f138799 = @orderNo`;
 
@@ -255,7 +251,7 @@ const SQL_TEMPLATES: Record<BaseName, string> = {
   "中试广州": SQL_ZHONGSHI_GUANGZHOU,
   "小试":     SQL_XIAOSHI,
   "中试上海": SQL_ZHONGSHI_SHANGHAI,
-  "中试天津": SQL_ZHONGSHI_TIANJIN,
+  "OA辅助单": SQL_OA_ASSIST,
 };
 
 // ============================================
@@ -286,10 +282,8 @@ export async function queryOrderProgress(
   const pool = await getPool();
   const request = pool.request();
   request.input("orderNo", sql.NVarChar, orderNo);
-  // 仅 小试 / 中试天津 的 SQL 用到 @base
-  if (base === "小试" || base === "中试天津") {
-    request.input("base", sql.NVarChar, base);
-  }
+  // 4 套模板均只用到 @orderNo：
+  //   中试广州 / 中试上海 使用硬编码人员名；小试 / OA辅助单 为全集团范围，不绑定 base
 
   const result = await request.query(sqlText);
   const rows = (result.recordset || []) as Record<string, unknown>[];
