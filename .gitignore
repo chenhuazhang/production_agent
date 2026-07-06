@@ -36,8 +36,14 @@ Thumbs.db
 # Claude Code internal
 .superpowers/
 
+# Agent runtime logs
+data/logs/
+
 # Generated
 src/generated/
+
+# Archives
+*.zip
 
 # Docs (optional)
 docs/superpowers/

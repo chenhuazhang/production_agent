@@ -78,7 +78,7 @@ export async function createSession(config: AgentConfig = {}) {
   const { session } = await createAgentSession({
     cwd,
     model,
-    thinkingLevel: "off", // 默认关闭思考；如用 reasoning 模型可改 "medium"/"high"
+    thinkingLevel: "low", // 启用思考链（reasoning 模型会输出 thinking_delta，已转发到前端）
     authStorage,
     modelRegistry,
     sessionManager: SessionManager.create(cwd),

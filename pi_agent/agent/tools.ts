@@ -24,9 +24,11 @@ import {
 import {
   queryOrderProgress,
   queryOrderProgressMany,
+  getRealTimePendingCounts,
   ALL_BASE_NAMES,
   type BaseName,
 } from "./services/sqlServer.js";
+import { checkPermission } from "./services/permissionGuard.js";
 
 // ============================================
 // 工具：查询订单进度
@@ -54,6 +56,9 @@ export const queryOrderProgressTool = defineTool({
     ),
   }),
   execute: async (_id, params) => {
+    const perm = checkPermission("query_order_progress", params as Record<string, unknown>);
+    if (!perm.allowed) return textResult({ error: perm.reason });
+
     const { order_no, base } = params as { order_no: string; base?: BaseName };
     try {
       if (base) {
@@ -106,6 +111,9 @@ export const searchOrdersTool = defineTool({
     keyword: Type.String({ description: "搜索关键词：订单号 / 客户名称 / 产品名称" }),
   }),
   execute: async (_id, params) => {
+    const perm = checkPermission("search_orders", params as Record<string, unknown>);
+    if (!perm.allowed) return textResult({ error: perm.reason });
+
     const { keyword } = params as { keyword: string };
     const results = searchOrders(keyword);
     const result = results.length
@@ -124,7 +132,9 @@ export const getProductionStagesTool = defineTool({
   label: "获取生产流程",
   description: "获取中试订单的标准生产流程工序列表。",
   parameters: Type.Object({}),
-  execute: async () => {
+  execute: async (_id, params) => {
+    const perm = checkPermission("get_production_stages", params as Record<string, unknown>);
+    if (!perm.allowed) return textResult({ error: perm.reason });
     return textResult({
       stages: PRODUCTION_STAGES,
       description: "订单从下单到入库的标准生产流程",
@@ -146,11 +156,30 @@ export const analyzeCapacityTool = defineTool({
     ),
   }),
   execute: async (_id, params) => {
+    const perm = checkPermission("analyze_capacity", params as Record<string, unknown>);
+    if (!perm.allowed) return textResult({ error: perm.reason });
+
     const { base_name } = params as { base_name?: string };
+
+    // 尝试从 SQL Server 获取实时待处理数
+    let realCounts: Map<string, number> = new Map();
+    try {
+      const snapshots = await getRealTimePendingCounts(90);
+      for (const s of snapshots) {
+        realCounts.set(s.baseName, s.pendingOrders);
+      }
+    } catch (err) {
+      console.warn("[capacity] SQL query failed, using mock fallback:", err instanceof Error ? err.message : err);
+    }
+
+    function getPending(baseName: string): number {
+      return realCounts.get(baseName) ?? getPendingOrdersByBase(baseName);
+    }
+
     if (base_name) {
       const config = BASE_CONFIGS.find((c) => c.name === base_name);
       if (!config) return textResult({ error: `未找到基地: ${base_name}` });
-      const pending = getPendingOrdersByBase(config.name);
+      const pending = getPending(config.name);
       const result = analyzeBaseCapacity({
         base_name: config.name,
         location: config.location,
@@ -158,10 +187,14 @@ export const analyzeCapacityTool = defineTool({
         per_machine_daily_output: config.per_machine_daily_output,
         pending_orders: pending,
       });
-      return textResult({ base: result });
+      return textResult({
+        base: result,
+        data_source: realCounts.has(config.name) ? "SQL Server 实时数据" : "模拟数据",
+      });
     }
+
     const bases: BaseCapacity[] = BASE_CONFIGS.map((config) => {
-      const pending = getPendingOrdersByBase(config.name);
+      const pending = getPending(config.name);
       return analyzeBaseCapacity({
         base_name: config.name,
         location: config.location,
@@ -170,7 +203,12 @@ export const analyzeCapacityTool = defineTool({
         pending_orders: pending,
       });
     });
-    return textResult({ bases, total_bases: bases.length });
+
+    return textResult({
+      bases,
+      total_bases: bases.length,
+      data_source: realCounts.size > 0 ? "SQL Server 实时数据" : "模拟数据",
+    });
   },
 });
 
@@ -183,7 +221,10 @@ export const recommendBaseTool = defineTool({
   label: "推荐下单基地",
   description: "根据各基地当前产能负荷，智能推荐最适合下单的中试基地。",
   parameters: Type.Object({}),
-  execute: async () => {
+  execute: async (_id, params) => {
+    const perm = checkPermission("recommend_base", params as Record<string, unknown>);
+    if (!perm.allowed) return textResult({ error: perm.reason });
+
     const basesData: BaseCapacity[] = BASE_CONFIGS.map((config) => {
       const pending = getPendingOrdersByBase(config.name);
       return analyzeBaseCapacity({
@@ -222,6 +263,9 @@ export const estimateDeliveryTool = defineTool({
     ),
   }),
   execute: async (_id, params) => {
+    const perm = checkPermission("estimate_delivery", params as Record<string, unknown>);
+    if (!perm.allowed) return textResult({ error: perm.reason });
+
     const { base_name, order_quantity } = params as {
       base_name: string;
       order_quantity?: number;

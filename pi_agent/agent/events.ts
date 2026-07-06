@@ -29,6 +29,9 @@ function transformEvent(raw: RawEvent): AgentEvent | null {
       if (raw.assistantMessageEvent.type === "text_delta") {
         return { type: "text_delta", delta: raw.assistantMessageEvent.delta };
       }
+      if (raw.assistantMessageEvent.type === "thinking_delta") {
+        return { type: "thinking_delta", delta: raw.assistantMessageEvent.delta };
+      }
       return null;
     }
     case "tool_execution_start":
@@ -65,6 +68,9 @@ export function printEvent(event: AgentEvent): void {
   switch (event.type) {
     case "text_delta":
       process.stdout.write(event.delta);
+      break;
+    case "thinking_delta":
+      process.stdout.write(`\n🧠 [思考] ` + event.delta.slice(0, 80));
       break;
     case "tool_start":
       console.log(`\n🔧 [工具] ${event.toolName}`);

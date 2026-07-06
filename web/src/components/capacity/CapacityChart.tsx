@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { getLoadColor, getLoadBg, getLoadLabel, getLoadBarColor } from "@/lib/load-utils";
 
 interface BaseCapacity {
   base_name: string;
@@ -10,27 +11,6 @@ interface BaseCapacity {
   load_rate: number;
   overload_multiplier: number;
   days_to_complete: number;
-}
-
-function getLoadColor(loadRate: number): string {
-  if (loadRate >= 100) return "text-red-600";
-  if (loadRate >= 70) return "text-orange-500";
-  if (loadRate >= 40) return "text-yellow-600";
-  return "text-green-600";
-}
-
-function getLoadBg(loadRate: number): string {
-  if (loadRate >= 100) return "bg-red-100";
-  if (loadRate >= 70) return "bg-orange-100";
-  if (loadRate >= 40) return "bg-yellow-100";
-  return "bg-green-100";
-}
-
-function getLoadLabel(loadRate: number): string {
-  if (loadRate >= 100) return "超负荷";
-  if (loadRate >= 70) return "较高";
-  if (loadRate >= 40) return "适中";
-  return "空闲";
 }
 
 export function CapacityChart({ bases }: { bases: BaseCapacity[] }) {
@@ -59,15 +39,7 @@ export function CapacityChart({ bases }: { bases: BaseCapacity[] }) {
               </div>
               <div className="w-full bg-gray-200 rounded-full h-3">
                 <div
-                  className={`h-3 rounded-full transition-all ${
-                    base.load_rate >= 100
-                      ? "bg-red-500"
-                      : base.load_rate >= 70
-                      ? "bg-orange-400"
-                      : base.load_rate >= 40
-                      ? "bg-yellow-400"
-                      : "bg-green-400"
-                  }`}
+                  className={`h-3 rounded-full transition-all ${getLoadBarColor(base.load_rate)}`}
                   style={{ width: `${Math.min((base.load_rate / maxLoad) * 100, 100)}%` }}
                 />
               </div>

@@ -7,8 +7,11 @@
  * URL 由 env AI_API_URL 配置，向后兼容 PYTHON_API_URL，默认 http://localhost:8000
  */
 
+// 服务端用内网地址，浏览器用相对路径（走 Next.js 代理）
 const AI_API_URL =
-  process.env.AI_API_URL || process.env.PYTHON_API_URL || "http://localhost:8000";
+  typeof window === "undefined"
+    ? (process.env.AI_API_URL || process.env.PYTHON_API_URL || "http://localhost:8000")
+    : "";
 
 export interface ChatRequest {
   message: string;
@@ -19,6 +22,8 @@ export interface ChatRequest {
 /** SSE 事件回调 */
 export interface StreamHandlers {
   onTextDelta?: (delta: string) => void;
+  /** 模型的内部思考链（reasoning tokens），前端展示为可折叠灰色框 */
+  onThinkingDelta?: (delta: string) => void;
   onToolStart?: (toolName: string, args: Record<string, unknown>) => void;
   onToolEnd?: (toolName: string, isError: boolean, result: unknown) => void;
   onDone?: () => void;
@@ -80,6 +85,11 @@ export async function sendChatMessageStream(
         case "text_delta": {
           const d = safeJson<{ delta?: string }>(dataStr);
           if (d?.delta) handlers.onTextDelta?.(d.delta);
+          break;
+        }
+        case "thinking_delta": {
+          const d = safeJson<{ delta?: string }>(dataStr);
+          if (d?.delta) handlers.onThinkingDelta?.(d.delta);
           break;
         }
         case "tool_start": {

@@ -16,6 +16,7 @@ export type {
   AgentEvent,
   AgentEventHandler,
   TextDeltaEvent,
+  ThinkingDeltaEvent,
   ToolStartEvent,
   ToolEndEvent,
   AgentDoneEvent,
@@ -50,3 +51,13 @@ export { subscribeToEvents, printEvent } from "./events";
 
 // ── Session ────────────────────────────────────
 export { createSession } from "./session";
+
+// ── Auth & Permission ─────────────────────────
+export {
+  runWithUser,
+  getCurrentUser,
+  requireCurrentUser,
+  type UserContext,
+  type UserRole,
+} from "./services/userContext";
+export { checkPermission, type PermissionResult } from "./services/permissionGuard";

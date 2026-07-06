@@ -13,6 +13,7 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { chatRoute } from "./routes/chat";
+import { sessionsRoute } from "./routes/sessions";
 import { SessionStore } from "./services/sessionStore";
 import { createLogger } from "./services/logger";
 import { createSession } from "pi-agent";
@@ -54,14 +55,16 @@ async function main() {
   }, 5 * 60 * 1000);
 
   app.route("/api/chat", chatRoute(sessionStore));
+  app.route("/api/sessions", sessionsRoute());
 
   app.get("/health", (c) => c.json({ status: "ok", service: "production-agent" }));
 
   serve({ fetch: app.fetch, port: PORT, hostname: "0.0.0.0" });
 
   console.log(`🚀 Server running at http://localhost:${PORT}`);
-  console.log(`📡 Chat API: POST http://localhost:${PORT}/api/chat/:sessionId`);
-  console.log(`❤️  Health:   GET  http://localhost:${PORT}/health`);
+  console.log(`📡 Chat API:    POST http://localhost:${PORT}/api/chat/:sessionId`);
+  console.log(`📁 Sessions:    GET  http://localhost:${PORT}/api/sessions`);
+  console.log(`❤️  Health:      GET  http://localhost:${PORT}/health`);
   logger.info("Server started", { port: PORT });
 }
 

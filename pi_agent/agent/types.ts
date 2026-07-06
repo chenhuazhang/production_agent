@@ -35,6 +35,11 @@ export interface TextDeltaEvent {
   delta: string;
 }
 
+export interface ThinkingDeltaEvent {
+  type: "thinking_delta";
+  delta: string;
+}
+
 export interface ToolStartEvent {
   type: "tool_start";
   toolName: string;
@@ -65,6 +70,7 @@ export interface ErrorEvent {
 
 export type AgentEvent =
   | TextDeltaEvent
+  | ThinkingDeltaEvent
   | ToolStartEvent
   | ToolEndEvent
   | AgentDoneEvent

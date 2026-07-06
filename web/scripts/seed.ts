@@ -10,11 +10,11 @@ async function main() {
   console.log("Seeding database...");
 
   const bases = [
-    { name: "广州基地", location: "广东广州", machineCount: 12, perMachineDailyOutput: 8 },
-    { name: "上海基地", location: "上海", machineCount: 10, perMachineDailyOutput: 10 },
-    { name: "成都基地", location: "四川成都", machineCount: 15, perMachineDailyOutput: 7 },
-    { name: "武汉基地", location: "湖北武汉", machineCount: 9, perMachineDailyOutput: 9 },
-    { name: "天津基地", location: "天津", machineCount: 8, perMachineDailyOutput: 6 },
+    { name: "广州基地", location: "广东广州", dataSource: "广州中试", machineCount: 12, perMachineDailyOutput: 8 },
+    { name: "上海基地", location: "上海", dataSource: "上海中试", machineCount: 10, perMachineDailyOutput: 10 },
+    { name: "成都基地", location: "四川成都", dataSource: "小试", machineCount: 15, perMachineDailyOutput: 7 },
+    { name: "武汉基地", location: "湖北武汉", dataSource: "小试", machineCount: 9, perMachineDailyOutput: 9 },
+    { name: "天津基地", location: "天津", dataSource: "小试", machineCount: 8, perMachineDailyOutput: 6 },
   ];
 
   for (const base of bases) {

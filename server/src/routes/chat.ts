@@ -11,12 +11,24 @@ import { streamSSE } from "hono/streaming";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { SessionStore } from "../services/sessionStore";
 import { createLogger } from "../services/logger";
+import { runWithUser, type UserContext } from "pi-agent";
+import { ExecutionTracer } from "../services/executionTracer";
 
 const logger = createLogger("chat");
+const tracer = new ExecutionTracer();
 
 interface ChatRequest {
   text: string;
+  /** 用户身份（从 CRM token 解析后传入） */
+  user?: UserContext;
 }
+
+/** 默认匿名用户（未接入 CRM 鉴权时使用，无限制） */
+const ANON_USER: UserContext = {
+  userId: "anonymous",
+  role: "supervisor",
+  baseId: null,
+};
 
 type RawEvent = Parameters<Parameters<AgentSession["subscribe"]>[0]>[0];
 
@@ -25,6 +37,9 @@ function transformAgentEvent(raw: RawEvent): { event: string; data: object } | n
     case "message_update": {
       if (raw.assistantMessageEvent.type === "text_delta") {
         return { event: "text_delta", data: { delta: raw.assistantMessageEvent.delta } };
+      }
+      if (raw.assistantMessageEvent.type === "thinking_delta") {
+        return { event: "thinking_delta", data: { delta: raw.assistantMessageEvent.delta } };
       }
       return null;
     }
@@ -89,10 +104,17 @@ export function chatRoute(store: SessionStore) {
     }
     store.setBusy(sessionId, true);
 
+    const user = body.user ?? ANON_USER;
+
     return streamSSE(c, async (stream) => {
       let unsubscribe: (() => void) | null = null;
+      const traceId = tracer.start(sessionId, text, user);
       try {
         unsubscribe = entry.session.subscribe((raw) => {
+          // 喂给 tracer（结构化日志持久化）
+          tracer.record(raw, traceId);
+
+          // 喂给 SSE（实时推送前端）
           const sse = transformAgentEvent(raw);
           if (sse) {
             stream.writeSSE({ event: sse.event, data: JSON.stringify(sse.data) });
@@ -101,10 +123,13 @@ export function chatRoute(store: SessionStore) {
         });
 
         logger.info("Executing prompt", { sessionId, textLength: text.length });
-        await entry.session.prompt(text);
+        // 👇 权限上下文：工具执行时通过 ALS 读取用户身份
+        await runWithUser(user, () => entry.session.prompt(text));
+        tracer.finish(traceId);
         logger.response(sessionId, Date.now() - startTime);
       } catch (error) {
         const msg = error instanceof Error ? error.message : "Unknown error";
+        tracer.error(traceId, msg);
         logger.error("Prompt execution failed", { sessionId, error: msg });
         await stream.writeSSE({ event: "error", data: JSON.stringify({ message: msg }) });
       } finally {

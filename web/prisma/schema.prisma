@@ -11,12 +11,14 @@ model Base {
   id                    String             @id @default(cuid())
   name                  String
   location              String
+  dataSource            String             @default("小试") @map("data_source") // 广州中试 | 上海中试 | 小试 | OA辅助单
   machineCount          Int                @map("machine_count")
   perMachineDailyOutput Int                @map("per_machine_daily_output")
   active                Boolean            @default(true)
   createdAt             DateTime           @default(now()) @map("created_at")
   updatedAt             DateTime           @updatedAt @map("updated_at")
   snapshots             CapacitySnapshot[]
+  orders                Order[]
   conversations         Conversation[]
 
   @@map("bases")
@@ -35,6 +37,42 @@ model CapacitySnapshot {
   createdAt      DateTime @default(now()) @map("created_at")
 
   @@map("capacity_snapshots")
+}
+
+model Order {
+  id                        String         @id @default(cuid())
+  baseId                    String         @map("base_id")
+  base                      Base           @relation(fields: [baseId], references: [id])
+  orderNumber               String         @unique @map("order_number")
+  productName               String         @map("product_name")
+  customerName              String         @map("customer_name")
+  machine                   String?        // 机台号 (f52974/f102932/f96435/f138800)
+  orderCount                Float          @default(1) @map("order_count") // 批次数量
+  status                    String         @default("not_started") // not_started | in_progress | completed
+  priority                  String         @default("normal") // normal | urgent
+  deliveryDate              DateTime       @map("delivery_date")
+  currentStage              String?        @map("current_stage")
+  extrusionException        Boolean        @default(false) @map("extrusion_exception")
+  injectionStripException   Boolean        @default(false) @map("injection_strip_exception")
+  injectionColorPlateException Boolean     @default(false) @map("injection_color_plate_exception")
+  createdAt                 DateTime       @default(now()) @map("created_at")
+  updatedAt                 DateTime       @updatedAt @map("updated_at")
+  stages                    ProcessStage[]
+
+  @@map("orders")
+}
+
+model ProcessStage {
+  id          String    @id @default(cuid())
+  orderId     String    @map("order_id")
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  name        String    // 开单 | 排产 | 色粉计量 | 混料 | 挤出 | 注塑色板 | 注塑样条 | 最终完成
+  status      String    @default("pending") // pending | in_progress | completed
+  person      String?
+  completedAt DateTime? @map("completed_at") // 实际完成时间 (对应SQL中的各time字段)
+  sortOrder   Int       @default(0) @map("sort_order")
+
+  @@map("process_stages")
 }
 
 model Conversation {

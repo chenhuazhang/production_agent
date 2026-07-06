@@ -152,13 +152,14 @@ WHERE t.f52977 = @orderNo`;
 const SQL_XIAOSHI = `
 SELECT DISTINCT
     t.f102935 AS order_no,
+    t.f102925 AS base,
     t.f102932 AS machine,
     t.f102936 AS order_count,
     t.f140432 AS extrusion_exception,
     t.f140431 AS injection_strip_exception,
-    p.开单人员        AS creator,
+    '' AS creator,
     t.f102950 AS create_order_time,
-    p.色粉计量人员    AS color_powder_measurer,
+    '' AS color_powder_measurer,
     t.f102957 AS color_powder_measure_time,
     p.混料人员        AS mixing_person,
     t.f102959 AS mixing_time,
@@ -171,18 +172,22 @@ SELECT DISTINCT
     t.f140798 AS scheduling_time,
     p.排产完成人员    AS scheduling_person
 FROM tabdiytable5992 t
-CROSS JOIN (
-    SELECT
-        '' AS 开单人员,
-        '' AS 色粉计量人员,
+LEFT JOIN (
+    SELECT f136277,
         MAX(CASE WHEN f53444 = '混料'     THEN f53443 END) AS 混料人员,
         MAX(CASE WHEN f53444 = '挤出'     THEN f53443 END) AS 挤出人员,
         MAX(CASE WHEN f53444 = '注塑'     THEN f53443 END) AS 注塑样条人员,
         MAX(CASE WHEN f53444 = '最终班长' THEN f53443 END) AS 最终班长,
         MAX(CASE WHEN f53444 = '排产'     THEN f53443 END) AS 排产完成人员
-    FROM tabdiytable3439
-    WHERE f53444 IN ('混料', '挤出', '注塑', '最终班长', '排产')
-) p
+    FROM (
+        SELECT f136277, f53444, f53443,
+               ROW_NUMBER() OVER (PARTITION BY f136277, f53444 ORDER BY ID DESC) AS rn
+        FROM tabdiytable3439
+        WHERE f53444 IN ('混料', '挤出', '注塑', '最终班长', '排产')
+    ) ranked
+    WHERE rn = 1
+    GROUP BY f136277
+) p ON p.f136277 = t.f102925
 WHERE t.f102935 = @orderNo`;
 
 const SQL_ZHONGSHI_SHANGHAI = `
@@ -232,19 +237,26 @@ SELECT DISTINCT
     t.f138799 AS order_no,
     t.f138800 AS machine,
     t.f138820 AS order_count,
+    t2.f138796 AS base,
     t.f140730 AS injection_strip_exception,
     t.f138823 AS scheduling_time,
-    p.排产完成人员    AS scheduling_person,
-    p.最终班长        AS injection_strip_person,
+    p.注塑人员        AS scheduling_person,
+    p.注塑人员        AS injection_strip_person,
     t.f138978 AS injection_strip_time
 FROM tabdiytable8460 t
-CROSS JOIN (
-    SELECT
-        MAX(CASE WHEN f53444 = '注塑' THEN f53443 END) AS 排产完成人员,
-        MAX(CASE WHEN f53444 = '注塑' THEN f53443 END) AS 最终班长
-    FROM tabdiytable3439
-    WHERE f53444 IN ('注塑')
-) p
+LEFT JOIN tabdiytable8459 t2 ON t.ID = t2.ID
+LEFT JOIN (
+    SELECT f136277,
+        MAX(CASE WHEN f53444 = '注塑' THEN f53443 END) AS 注塑人员
+    FROM (
+        SELECT f136277, f53444, f53443,
+               ROW_NUMBER() OVER (PARTITION BY f136277, f53444 ORDER BY ID DESC) AS rn
+        FROM tabdiytable3439
+        WHERE f53444 IN ('注塑', '排产')
+    ) ranked
+    WHERE rn = 1
+    GROUP BY f136277
+) p ON p.f136277 = t2.f138796
 WHERE t.f138799 = @orderNo`;
 
 const SQL_TEMPLATES: Record<BaseName, string> = {
@@ -309,4 +321,98 @@ export async function queryOrderProgressMany(
     found: false,
     error: err instanceof Error ? err.message : String(err),
   }))));
+}
+
+// ── 实时产能负荷统计 ──
+
+export interface CapacitySnapshot {
+  baseName: string;       // e.g. "广州基地"
+  totalOrders: number;
+  pendingOrders: number;  // 未完成
+  completedOrders: number;
+}
+
+/**
+ * 从 SQL Server 实时统计各基地待处理订单数。
+ * 聚合 广州中试 + 小试 + OA辅助单 三个数据源。
+ * （上海中试 JOIN 太慢暂不纳入，待 SQL 优化）
+ */
+export async function getRealTimePendingCounts(sinceDays: number = 90): Promise<CapacitySnapshot[]> {
+  const pool = await getPool();
+  const since = new Date();
+  since.setDate(since.getDate() - sinceDays);
+  const sinceStr = since.toISOString().slice(0, 10);
+
+  const baseMap = new Map<string, { total: number; pending: number; completed: number }>();
+
+  function add(base: string, total: number, pending: number, completed: number) {
+    if (!base) return;
+    const existing = baseMap.get(base) || { total: 0, pending: 0, completed: 0 };
+    existing.total += total;
+    existing.pending += pending;
+    existing.completed += completed;
+    baseMap.set(base, existing);
+  }
+
+  // 广州中试
+  try {
+    const r = await pool.request().input("s", sql.NVarChar, sinceStr)
+      .query(`SELECT
+        SUM(CASE WHEN f53419 <= '1900-01-02' THEN 1 ELSE 0 END) as pending,
+        SUM(CASE WHEN f53419 > '1900-01-02' THEN 1 ELSE 0 END) as completed
+      FROM tabdiytable3393 WHERE f52994 > @s`);
+    if (r.recordset.length > 0) {
+      const row = r.recordset[0];
+      add("广州基地", Number(row.pending) + Number(row.completed), Number(row.pending), Number(row.completed));
+    }
+  } catch (err) {
+    console.warn("[capacity] 广州中试 count failed:", err instanceof Error ? err.message : err);
+  }
+
+  // 小试（按 base 分组）
+  try {
+    const r = await pool.request().input("s", sql.NVarChar, sinceStr)
+      .query(`SELECT f102925 AS base,
+        SUM(CASE WHEN f102967 <= '1900-01-02' THEN 1 ELSE 0 END) as pending,
+        SUM(CASE WHEN f102967 > '1900-01-02' THEN 1 ELSE 0 END) as completed
+      FROM tabdiytable5992 WHERE f102959 > @s
+      GROUP BY f102925`);
+    for (const row of r.recordset || []) {
+      const b = String(row.base || "").trim();
+      if (b) {
+        const baseName = b + "基地";
+        add(baseName, Number(row.pending) + Number(row.completed), Number(row.pending), Number(row.completed));
+      }
+    }
+  } catch (err) {
+    console.warn("[capacity] 小试 count failed:", err instanceof Error ? err.message : err);
+  }
+
+  // OA辅助单（按 base 分组）
+  try {
+    const r = await pool.request().input("s", sql.NVarChar, sinceStr)
+      .query(`SELECT t2.f138796 AS base,
+        SUM(CASE WHEN t.f138978 IS NULL OR t.f138978 <= '1900-01-02' THEN 1 ELSE 0 END) as pending,
+        SUM(CASE WHEN t.f138978 > '1900-01-02' THEN 1 ELSE 0 END) as completed
+      FROM tabdiytable8460 t
+      LEFT JOIN tabdiytable8459 t2 ON t.ID = t2.ID
+      WHERE t.f138823 > @s
+      GROUP BY t2.f138796`);
+    for (const row of r.recordset || []) {
+      const b = String(row.base || "").trim();
+      if (b) {
+        const baseName = b + "基地";
+        add(baseName, Number(row.pending) + Number(row.completed), Number(row.pending), Number(row.completed));
+      }
+    }
+  } catch (err) {
+    console.warn("[capacity] OA count failed:", err instanceof Error ? err.message : err);
+  }
+
+  return Array.from(baseMap.entries()).map(([baseName, v]) => ({
+    baseName,
+    totalOrders: v.total,
+    pendingOrders: v.pending,
+    completedOrders: v.completed,
+  }));
 }

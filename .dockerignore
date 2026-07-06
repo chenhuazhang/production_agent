@@ -1,0 +1,71 @@
+# 密钥和配置
+.env
+.env.*
+!pi_agent/.env
+*.pem
+*.key
+
+# 依赖
+node_modules/
+.pnp
+.pnp.js
+
+# 构建产物（在镜像内构建）
+.next/
+dist/
+*.tsbuildinfo
+
+# 数据库
+*.db
+*.db-shm
+*.db-wal
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 文档和报告（不打包进镜像）
+docs/
+reports/
+documentation/
+README.md
+AGENTS.md
+CLAUDE.md
+
+# Claude / Superpowers
+.superpowers/
+.claude/
+
+# 测试
+tests/
+coverage/
+*.test.ts
+*.spec.ts
+
+# Python 旧版
+ai_service/
+*.py
+__pycache__/
+.venv/
+
+# 日志（运行时挂载 volume）
+data/logs/
+
+# Prisma 生成文件（在 web 构建时重新生成）
+web/src/generated/
+
+# Docker 自身
+Dockerfile*
+docker-compose*
+.dockerignore

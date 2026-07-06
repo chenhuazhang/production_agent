@@ -1,0 +1,73 @@
+# ===== Production Agent Web =====
+# Next.js 前端 + Prisma SQLite 本地缓存
+# 基于 Debian (glibc)，避免 Alpine musl 的 native 二进制兼容问题
+
+FROM node:22-slim AS base
+WORKDIR /app
+
+# Debian 编译 native 模块所需（better-sqlite3 等）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 make g++ && \
+    rm -rf /var/lib/apt/lists/*
+
+# ── 依赖层 ──────────────────────
+FROM base AS deps
+COPY package.json package-lock.json ./
+COPY web/package.json web/
+
+# 使用国内镜像加速（公司网络访问 npmjs.org 不稳定时启用）
+# RUN npm config set registry https://registry.npmmirror.com
+
+# npm install 替代 npm ci：lockfile 在 Windows 上生成，缺失 Linux 平台
+# optionalDependencies（lightningcss / @tailwindcss/oxide 等）
+RUN npm install --workspace=web --include-workspace-root
+
+# workspace install 可能跳过 transitive optionalDeps，单独重装原生包
+RUN cd /app/web && npm install --no-save lightningcss @tailwindcss/oxide
+
+# ── 构建层 ──────────────────────
+FROM deps AS builder
+WORKDIR /app
+
+COPY web/ ./web/
+
+WORKDIR /app/web
+ENV DATABASE_URL="file:./dev.db"
+RUN npx prisma generate
+# 初始化 SQLite 本地库（Dashboard 降级用）
+RUN npx prisma migrate deploy
+RUN npx tsx scripts/seed.ts
+
+WORKDIR /app
+RUN npm run build --workspace=web
+
+# ── 运行层 ──────────────────────
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV DATABASE_URL="file:./dev.db"
+
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/web/node_modules ./web/node_modules
+COPY --from=builder /app/web/.next ./web/.next
+COPY --from=builder /app/web/public ./web/public
+COPY --from=builder /app/web/package.json ./web/package.json
+COPY --from=builder /app/web/prisma ./web/prisma
+COPY --from=builder /app/web/src/generated ./web/src/generated
+
+# 非 root 用户运行
+RUN addgroup --gid 1001 --system nodejs && \
+    adduser --system --uid 1001 --gid 1001 nextjs && \
+    chown -R nextjs:nodejs /app
+USER nextjs
+
+EXPOSE 3000
+
+WORKDIR /app/web
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000',r=>process.exit(r.statusCode===200?0:1))"
+
+CMD ["npx", "next", "start", "--port", "3000"]

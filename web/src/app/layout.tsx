@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { SessionProvider } from "@/lib/sessionContext";
 
 export const metadata: Metadata = {
   title: "中试 AI 助手",
@@ -18,8 +19,10 @@ export default function RootLayout({
         className="h-full flex"
         style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft YaHei", sans-serif' }}
       >
-        <Sidebar />
-        <main className="flex-1 flex flex-col overflow-hidden">{children}</main>
+        <SessionProvider>
+          <Sidebar />
+          <main className="flex-1 flex flex-col overflow-hidden">{children}</main>
+        </SessionProvider>
       </body>
     </html>
   );
