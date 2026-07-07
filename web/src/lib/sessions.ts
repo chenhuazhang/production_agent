@@ -5,7 +5,11 @@
  * GET /api/sessions/:sessionId   — 单会话消息详情
  */
 
-const API_URL = process.env.AI_API_URL || process.env.PYTHON_API_URL || "http://localhost:8000";
+// 服务端用内网地址，浏览器直连后端（后端已开启 CORS）
+const API_URL =
+  typeof window === "undefined"
+    ? (process.env.AI_API_URL || process.env.PYTHON_API_URL || "http://localhost:8000")
+    : (process.env.NEXT_PUBLIC_AI_API_URL || process.env.NEXT_PUBLIC_PYTHON_API_URL || "http://localhost:8000");
 
 export interface SessionListItem {
   id: string;
@@ -14,6 +18,7 @@ export interface SessionListItem {
   modified: string;
   messageCount: number;
   firstMessage: string;
+  pinned?: boolean;
 }
 
 export interface HistoryMessage {
@@ -42,6 +47,26 @@ export async function fetchSessionList(): Promise<SessionListItem[]> {
 export async function deleteSession(sessionId: string): Promise<boolean> {
   const res = await fetch(`${API_URL}/api/sessions/${encodeURIComponent(sessionId)}`, {
     method: "DELETE",
+  });
+  return res.ok;
+}
+
+/** 重命名指定会话 */
+export async function renameSession(sessionId: string, newName: string): Promise<boolean> {
+  const res = await fetch(`${API_URL}/api/sessions/${encodeURIComponent(sessionId)}/rename`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: newName }),
+  });
+  return res.ok;
+}
+
+/** 置顶/取消置顶指定会话 */
+export async function pinSession(sessionId: string, pinned: boolean = true): Promise<boolean> {
+  const res = await fetch(`${API_URL}/api/sessions/${encodeURIComponent(sessionId)}/pin`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pinned }),
   });
   return res.ok;
 }

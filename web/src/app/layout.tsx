@@ -17,11 +17,11 @@ export default function RootLayout({
     <html lang="zh-CN" className="h-full antialiased">
       <body
         className="h-full flex"
-        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft YaHei", sans-serif' }}
+        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft YaHei", sans-serif', background: '#faf8f5' }}
       >
         <SessionProvider>
           <Sidebar />
-          <main className="flex-1 flex flex-col overflow-hidden">{children}</main>
+          <main className="flex-1 flex flex-col overflow-hidden bg-white">{children}</main>
         </SessionProvider>
       </body>
     </html>

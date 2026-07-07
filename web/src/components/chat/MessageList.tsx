@@ -28,11 +28,11 @@ function ThinkingBox({ text, isLoading }: { text: string; isLoading: boolean }) 
       onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
       className="mb-2"
     >
-      <summary className="text-xs text-gray-400 cursor-pointer select-none flex items-center gap-1.5">
-        <span className="inline-block w-2 h-2 rounded-full bg-amber-400" />
+      <summary className="text-xs text-[#8a8599] cursor-pointer select-none flex items-center gap-1.5">
+        <span className="inline-block w-2 h-2 rounded-full bg-[#8b7fc7]" />
         思考过程{isLoading ? "…" : ""}
       </summary>
-      <div className="mt-1.5 p-2.5 bg-gray-50 rounded border border-gray-200 text-xs text-gray-500 whitespace-pre-wrap font-mono leading-relaxed max-h-60 overflow-y-auto">
+      <div className="mt-1.5 p-2.5 bg-[#f5f2ed] rounded border border-[#e8e4dd] text-xs text-[#6b6b7b] whitespace-pre-wrap font-mono leading-relaxed max-h-60 overflow-y-auto">
         {text}
       </div>
     </details>
@@ -55,21 +55,21 @@ export function MessageList({ messages }: { messages: Message[] }) {
             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[80%] rounded-lg px-4 py-2 ${
+              className={`max-w-[80%] rounded-xl px-4 py-2.5 ${
                 msg.role === "user"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-900"
+                  ? "bg-[#8b7fc7] text-white"
+                  : "bg-[#f5f2ed] text-[#1a1a2e] border border-[#e8e4dd]"
               }`}
             >
               {msg.isLoading ? (
                 <div className="flex items-center gap-1">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                  <span className="w-2 h-2 bg-[#b5b0c4] rounded-full animate-bounce" />
                   <span
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                    className="w-2 h-2 bg-[#b5b0c4] rounded-full animate-bounce"
                     style={{ animationDelay: "0.1s" }}
                   />
                   <span
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                    className="w-2 h-2 bg-[#b5b0c4] rounded-full animate-bounce"
                     style={{ animationDelay: "0.2s" }}
                   />
                 </div>
