@@ -32,11 +32,8 @@ WORKDIR /app
 COPY web/ ./web/
 
 WORKDIR /app/web
-ENV DATABASE_URL="file:./dev.db"
+# Prisma client 生成（PostgreSQL，连接串来自环境变量）
 RUN npx prisma generate
-# 初始化 SQLite 本地库（Dashboard 降级用）
-RUN npx prisma migrate deploy
-RUN npx tsx scripts/seed.ts
 
 WORKDIR /app
 RUN npm run build --workspace=web
@@ -47,7 +44,6 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV DATABASE_URL="file:./dev.db"
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/web/node_modules ./web/node_modules
@@ -70,4 +66,4 @@ WORKDIR /app/web
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000',r=>process.exit(r.statusCode===200?0:1))"
 
-CMD ["npx", "next", "start", "--port", "3000"]
+CMD npx prisma migrate deploy --schema=prisma/schema.prisma && npx next start --port 3000

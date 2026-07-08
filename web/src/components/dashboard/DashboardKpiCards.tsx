@@ -28,65 +28,65 @@ export function DashboardKpiCards({
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-      <Card>
+      <Card className="border-[#e8e4dd] bg-white">
         <CardContent className="p-4 flex items-center gap-3">
-          <ClipboardList className="h-8 w-8 text-blue-500 shrink-0" />
+          <ClipboardList className="h-8 w-8 text-[#8b7fc7] shrink-0" />
           <div>
-            <p className="text-xs text-gray-500">订单总数</p>
-            <p className="text-2xl font-bold text-blue-600">{totalOrders}</p>
+            <p className="text-xs text-[#8a8599]">订单总数</p>
+            <p className="text-2xl font-bold text-[#8b7fc7]">{totalOrders}</p>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-[#e8e4dd] bg-white">
         <CardContent className="p-4 flex items-center gap-3">
-          <Clock className="h-8 w-8 text-gray-400 shrink-0" />
+          <Clock className="h-8 w-8 text-[#b5b0c4] shrink-0" />
           <div>
-            <p className="text-xs text-gray-500">待开始</p>
-            <p className="text-2xl font-bold text-gray-600">{pendingCount}</p>
+            <p className="text-xs text-[#8a8599]">待开始</p>
+            <p className="text-2xl font-bold text-[#6b6b7b]">{pendingCount}</p>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-[#e8e4dd] bg-white">
         <CardContent className="p-4 flex items-center gap-3">
-          <PlayCircle className="h-8 w-8 text-amber-500 shrink-0" />
+          <PlayCircle className="h-8 w-8 text-[#d4a373] shrink-0" />
           <div>
-            <p className="text-xs text-gray-500">生产中</p>
-            <p className="text-2xl font-bold text-amber-600">{inProgressCount}</p>
+            <p className="text-xs text-[#8a8599]">生产中</p>
+            <p className="text-2xl font-bold text-[#c9915c]">{inProgressCount}</p>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-[#e8e4dd] bg-white">
         <CardContent className="p-4 flex items-center gap-3">
-          <CheckCircle2 className="h-8 w-8 text-green-500 shrink-0" />
+          <CheckCircle2 className="h-8 w-8 text-[#7c9a6b] shrink-0" />
           <div>
-            <p className="text-xs text-gray-500">已完成</p>
-            <p className="text-2xl font-bold text-green-600">{completedCount}</p>
+            <p className="text-xs text-[#8a8599]">已完成</p>
+            <p className="text-2xl font-bold text-[#7c9a6b]">{completedCount}</p>
           </div>
         </CardContent>
       </Card>
 
-      <Card className={overdueCount > 0 ? "border-red-300 bg-red-50" : warningCount > 0 ? "border-amber-300 bg-amber-50" : ""}>
+      <Card className={overdueCount > 0 ? "border-red-300 bg-red-50" : warningCount > 0 ? "border-[#d4a373] bg-[#fdf6ed]" : "border-[#e8e4dd] bg-white"}>
         <CardContent className="p-4 flex items-center gap-3">
           <AlertTriangle
             className={`h-8 w-8 shrink-0 ${
-              overdueCount > 0 ? "text-red-500" : warningCount > 0 ? "text-amber-500" : "text-gray-400"
+              overdueCount > 0 ? "text-red-500" : warningCount > 0 ? "text-[#d4a373]" : "text-[#b5b0c4]"
             }`}
           />
           <div>
-            <p className="text-xs text-gray-500">交期预警</p>
+            <p className="text-xs text-[#8a8599]">交期预警</p>
             <p className={`text-2xl font-bold ${
-              overdueCount > 0 ? "text-red-600" : warningCount > 0 ? "text-amber-600" : "text-gray-400"
+              overdueCount > 0 ? "text-red-600" : warningCount > 0 ? "text-[#c9915c]" : "text-[#b5b0c4]"
             }`}>
               {overdueCount + warningCount}
             </p>
             {(overdueCount > 0 || warningCount > 0) && (
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-[#8a8599]">
                 {overdueCount > 0 && <span className="text-red-500">逾期 {overdueCount}</span>}
                 {overdueCount > 0 && warningCount > 0 && " "}
-                {warningCount > 0 && <span className="text-amber-500">临期 {warningCount}</span>}
+                {warningCount > 0 && <span className="text-[#d4a373]">临期 {warningCount}</span>}
               </p>
             )}
           </div>
@@ -94,13 +94,13 @@ export function DashboardKpiCards({
       </Card>
 
       {totalExceptions > 0 && (
-        <Card className="border-orange-300 bg-orange-50">
+        <Card className="border-[#d4a373] bg-[#fdf6ed]">
           <CardContent className="p-4 flex items-center gap-3">
-            <AlertCircle className="h-8 w-8 text-orange-500 shrink-0" />
+            <AlertCircle className="h-8 w-8 text-[#d4a373] shrink-0" />
             <div>
-              <p className="text-xs text-gray-500">异常订单</p>
-              <p className="text-2xl font-bold text-orange-600">{totalExceptions}</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-[#8a8599]">异常订单</p>
+              <p className="text-2xl font-bold text-[#c9915c]">{totalExceptions}</p>
+              <p className="text-xs text-[#8a8599]">
                 {totalExtrusionExceptions > 0 && <span>挤出 {totalExtrusionExceptions}</span>}
                 {totalStripExceptions > 0 && <span> 注塑 {totalStripExceptions}</span>}
                 {totalColorPlateExceptions > 0 && <span> 色板 {totalColorPlateExceptions}</span>}

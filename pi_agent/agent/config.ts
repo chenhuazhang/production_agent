@@ -18,9 +18,9 @@ import type { Skill, SourceInfo } from "@earendil-works/pi-coding-agent";
  * 支持多供应商：deepseek / openai / qwen / anthropic / google …
  */
 export function getEnvConfig(): EnvConfig {
-  const provider = (process.env.AI_PROVIDER || "deepseek").toLowerCase();
-  const apiKey = process.env.AI_API_KEY;
-  const model = process.env.AI_MODEL || "deepseek-v4-flash";
+  const provider = (process.env.AI_PROVIDER || "deepseek").trim().toLowerCase();
+  const apiKey = process.env.AI_API_KEY?.trim();
+  const model = (process.env.AI_MODEL || "deepseek-v4-flash").trim();
 
   if (!apiKey) {
     throw new Error(

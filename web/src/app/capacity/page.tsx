@@ -52,7 +52,7 @@ export default function CapacityPage() {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="text-gray-500">加载产能数据中...</p>
+        <p className="text-[#8a8599]">加载产能数据中...</p>
       </div>
     );
   }
@@ -64,34 +64,34 @@ export default function CapacityPage() {
   const lowestBase = bases.length > 0 ? bases.reduce((min, b) => (b.load_rate < min.load_rate ? b : min)) : null;
 
   return (
-    <div className="flex-1 p-8 overflow-auto">
+    <div className="flex-1 p-8 overflow-auto bg-[#faf8f5]">
       <div className="max-w-5xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">基地负荷看板</h1>
+        <h1 className="text-2xl font-bold mb-6 text-[#1a1a2e]">基地负荷看板</h1>
 
         {/* Summary cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <Card>
+          <Card className="border-[#e8e4dd] bg-white">
             <CardContent className="p-4 text-center">
-              <p className="text-xs text-gray-500">基地总数</p>
-              <p className="text-2xl font-bold">{bases.length}</p>
+              <p className="text-xs text-[#8a8599]">基地总数</p>
+              <p className="text-2xl font-bold text-[#1a1a2e]">{bases.length}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-[#e8e4dd] bg-white">
             <CardContent className="p-4 text-center">
-              <p className="text-xs text-gray-500">总日产能</p>
-              <p className="text-2xl font-bold text-blue-600">{totalCapacity}</p>
+              <p className="text-xs text-[#8a8599]">总日产能</p>
+              <p className="text-2xl font-bold text-[#8b7fc7]">{totalCapacity}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-[#e8e4dd] bg-white">
             <CardContent className="p-4 text-center">
-              <p className="text-xs text-gray-500">总待处理</p>
-              <p className="text-2xl font-bold text-orange-600">{totalPending}</p>
+              <p className="text-xs text-[#8a8599]">总待处理</p>
+              <p className="text-2xl font-bold text-[#d4a373]">{totalPending}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-[#e8e4dd] bg-white">
             <CardContent className="p-4 text-center">
-              <p className="text-xs text-gray-500">平均负荷率</p>
-              <p className={`text-2xl font-bold ${avgLoad >= 70 ? "text-red-600" : "text-green-600"}`}>
+              <p className="text-xs text-[#8a8599]">平均负荷率</p>
+              <p className={`text-2xl font-bold ${avgLoad >= 70 ? "text-red-600" : "text-[#7c9a6b]"}`}>
                 {avgLoad}%
               </p>
             </CardContent>
@@ -99,11 +99,11 @@ export default function CapacityPage() {
         </div>
 
         {lowestBase && (
-          <Card className="mb-6 border-green-200 bg-green-50">
+          <Card className="mb-6 border-[#d4c9e8] bg-[#f0ebf7]">
             <CardContent className="p-4">
               <p className="text-sm">
-                <span className="font-medium text-green-800">推荐下单基地：</span>
-                <span className="text-green-700">
+                <span className="font-medium text-[#6b5f9e]">推荐下单基地：</span>
+                <span className="text-[#8b7fc7]">
                   {lowestBase.base_name}（负荷率 {lowestBase.load_rate}%，日产能 {lowestBase.daily_capacity} 单）
                 </span>
               </p>

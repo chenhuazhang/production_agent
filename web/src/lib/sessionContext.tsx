@@ -8,7 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { fetchSessionList, fetchSessionHistory, deleteSession as deleteSessionApi, type SessionListItem, type HistoryMessage } from "./sessions";
+import { fetchSessionList, fetchSessionHistory, deleteSession as deleteSessionApi, renameSession as renameSessionApi, pinSession as pinSessionApi, type SessionListItem, type HistoryMessage } from "./sessions";
 
 // ============================================
 // Context
@@ -29,6 +29,10 @@ interface SessionCtx {
   newSession: () => void;
   /** 删除会话 */
   deleteSession: (id: string) => void;
+  /** 重命名会话 */
+  renameSession: (id: string, newName: string) => Promise<boolean>;
+  /** 置顶/取消置顶会话 */
+  pinSession: (id: string, pinned?: boolean) => Promise<boolean>;
   /** 刷新历史列表 */
   refresh: () => void;
 }
@@ -98,11 +102,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }).catch(() => {});
   }, [sessionId, sessionList, persistId, refreshList]);
 
+  const renameSession = useCallback(async (id: string, newName: string): Promise<boolean> => {
+    const ok = await renameSessionApi(id, newName);
+    if (ok) refreshList();
+    return ok;
+  }, [refreshList]);
+
+  const pinSession = useCallback(async (id: string, pinned: boolean = true): Promise<boolean> => {
+    const ok = await pinSessionApi(id, pinned);
+    if (ok) refreshList();
+    return ok;
+  }, [refreshList]);
+
   const refresh = refreshList;
 
   return (
     <SessionContext.Provider
-      value={{ sessionId, sessionList, loading, mounted, switchSession, newSession, deleteSession, refresh }}
+      value={{ sessionId, sessionList, loading, mounted, switchSession, newSession, deleteSession, renameSession, pinSession, refresh }}
     >
       {children}
     </SessionContext.Provider>

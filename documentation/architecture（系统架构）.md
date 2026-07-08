@@ -11,7 +11,7 @@
 | 层级 | 技术 | 作用 |
 |-------|-----------|------|
 | Agent 框架 | `@earendil-works/pi-coding-agent` | LLM 调度、工具定义、会话管理、上下文压缩 |
-| AI 模型 | `@earendil-works/pi-ai` | 多供应商模型抽象（DeepSeek / OpenAI / Qwen / Anthropic / Google） |
+| AI 模型 | `@earendil-works/pi-ai` + `~/pi/agent/models.json` | 多供应商模型抽象（内置: DeepSeek / OpenAI / Qwen / Anthropic / Google；自定义: Bailian 百炼 → GLM-5.2） |
 | 后端服务 | Hono (Node.js) | HTTP + SSE 路由、Session 生命周期管理 |
 | 前端 | Next.js (App Router) | 聊天界面、生产看板、SSE 消费 |
 | 业务数据库 | SQL Server (mssql) | 中试生产管理 ERP 数据库，4 个业务范围 |
@@ -117,56 +117,94 @@
 
 ### 容器说明
 
-| 容器 | 镜像来源 | 端口映射 | 职责 |
-|------|---------|---------|------|
-| `agent` | `Dockerfile.server` 本地构建 | `8000:8000`（内部调试用） | Hono SSE 服务 + pi_agent 核心 + SQL Server 客户端 |
-| `web` | `Dockerfile.web` 本地构建 | `80:3000`（用户入口） | Next.js 前端 + Prisma SQLite 本地缓存 |
+| 容器 | 基础镜像 | 镜像来源 | 端口映射 | 职责 |
+|------|---------|---------|---------|------|
+| `agent` | `node:22-alpine` (Alpine/musl) | `Dockerfile.server` 本地构建 | `8000:8000` | Hono SSE 服务 + pi_agent 核心 + SQL Server 客户端 |
+| `web` | `node:22-slim` (Debian/glibc) | `Dockerfile.web` 本地构建 | `80:3000`（用户入口） | Next.js 前端 + Prisma SQLite（看板降级数据库） |
+
+> **基础镜像选型**：agent 用 Alpine（纯 JS，无 native 依赖）；web 用 Debian Slim（Tailwind v4 的 lightningcss 等需要 glibc 预编译二进制，Alpine/musl 不兼容）。
 
 ### 网络
 
 两个容器通过 Docker bridge 网络 `agent-net` 内部通信：
 
 ```
-web  ──HTTP──▶  agent:8000    （/api/chat、/api/sessions、/health）
-web  ──HTTP──▶  外部 LLM API  （通过 agent 转发，web 不直接调 LLM）
-agent ──TCP──▶  SQL Server    （172.18.28.88:1433，内网）
+浏览器 ──HTTP:80──▶ web (:3000)  ──HTTP──▶  agent:8000    （/api/chat、/api/sessions）
+                          │                           
+                          └── Next.js rewrites 代理：
+                              仅 /api/chat/* 和 /api/sessions/* 转发给 agent
+                              /api/dashboard、/api/bases 等由 Next.js 自己处理
+                          
+agent ──TCP──▶  SQL Server (172.18.28.88:1433，内网)
+agent ──HTTPS──▶ LLM API (Bailian 百炼 / 阿里云)
 ```
 
 ### 持久化
 
-| 数据 | 存储位置 | 生命周期 |
-|------|---------|---------|
-| 会话记录 | Docker Volume `agent-sessions` → 容器内 `/root/.pi` | 永久（除非手动删除 volume） |
-| 执行日志 | Docker Volume `agent-traces` → 容器内 `/app/data/logs/traces` | 永久（建议定期清理） |
-| 配置/密钥 | `deploy/.env` 文件挂载 | 随宿主机文件 |
+| 数据 | 存储位置 | 生命周期 | 说明 |
+|------|---------|---------|------|
+| 会话对话记录 | Docker Volume `agent-sessions` → 容器内 `/root/.pi` | 永久 | JSONL 格式，每轮对话一个文件 |
+| 执行日志 (traces) | Docker Volume `agent-traces` → 容器内 `/app/data/logs/traces` | 永久，建议定期清理 | 每次工具调用+耗时 |
+| LLM 配置 | `deploy/models.json` → `docker cp` 进容器 `/root/.pi/agent/models.json` | 容器重建后需重新 `docker cp` | 自定义 provider（百炼 bailian + GLM 模型） |
+| 配置/密钥 | `deploy/.env` | 宿主机文件 | 不入库、不入镜像 |
+| 看板降级数据库 | 容器内 `/app/web/prisma/dev.db` (SQLite) | 容器重建清空 | SQL Server 不通时自动降级到 seed 数据 |
 
 ### 部署文件
 
-| 文件 | 用途 |
-|------|------|
-| `docker-compose.yml` | 完整版：agent + web + nginx（需要外网拉 nginx 镜像） |
-| `docker-compose.simple.yml` | 简化版：agent + web（无 nginx，适合离线/内网环境） |
-| `Dockerfile.server` | agent 容器构建（node:20-alpine + tsx 运行时） |
-| `Dockerfile.web` | web 容器构建（node:20-alpine + next build → next start） |
-| `deploy/.env` | 生产环境变量（不入库、不入镜像） |
-| `.dockerignore` | 排除 node_modules / .git / 文档 / 测试 等 |
+| 文件 | 用途 | Git |
+|------|------|:--:|
+| `docker-compose.yml` | 编排 agent + web + nginx | ✅ |
+| `docker-compose.simple.yml` | 简化版：agent + web（无 nginx，内网推荐） | ✅ |
+| `Dockerfile.server` | agent 容器构建（node:22-alpine + tsx 运行时） | ✅ |
+| `Dockerfile.web` | web 容器构建（node:22-slim + Next.js + Prisma） | ✅ |
+| `.dockerignore` | 排除 node_modules/.git/文档/测试，保留 pi_agent/.env | ✅ |
+| `deploy/.env` | 生产环境变量（AI key / SQL 密码等） | ❌ `.gitignore` |
+| `deploy/.env.production` | 环境变量模板（占位值） | ✅ |
+| `deploy/models.json` | 百炼 bailian provider + GLM-5.2 模型定义 | ✅ |
+| `deploy/nginx.conf` | Nginx 反代 + SSL 配置模板 | ✅ |
+
+### 健康检查
+
+两个容器都用 Node.js 实现（不依赖 wget/curl）：
+
+```yaml
+# agent
+test: ["CMD", "node", "-e", "require('http').get('http://localhost:8000/health',r=>{process.exit(r.statusCode===200?0:1)})"]
+
+# web
+test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000',r=>{process.exit(r.statusCode===200?0:1)})"]
+```
 
 ### 启动命令
 
 ```bash
-# 完整版（含 nginx 反代）
+# 生产环境（简化版，内网推荐）
+docker compose -f docker-compose.simple.yml up -d --build
+
+# 生产环境（完整版，含 nginx 反代 + 未来 SSL）
 docker compose up -d --build
 
-# 简化版（无 nginx，内网直接部署推荐）
-docker compose -f docker-compose.simple.yml up -d --build
+# 只重建某个服务
+docker compose up -d --build web       # 前端改了
+docker compose up -d --build agent     # 后端改了
+
+# 配置变更（不用 --build，但必须 force-recreate）
+docker compose up -d --force-recreate agent
+
+# 从 GitHub 部署（服务器上）
+git pull origin main
+docker compose up -d --build web       # 或 agent
 ```
 
-### 健康检查
+### 首次部署额外步骤
 
-| 端点 | 预期响应 |
-|------|---------|
-| `http://服务器IP:8000/health` | `{"status":"ok","service":"production-agent"}` |
-| `http://服务器IP/health` | 同上（通过 web → agent 内部转发） |
+```bash
+# 1. 创建 deploy/.env（从模板填入真实密钥）
+cp deploy/.env.production deploy/.env
+
+# 2. 拷入 LLM 配置
+docker cp deploy/models.json 容器名:/root/.pi/agent/models.json
+```
 
 ## 信任边界
 
@@ -191,8 +229,29 @@ docker compose -f docker-compose.simple.yml up -d --build
 **关键信任假设**（当前状态）：
 1. **用户身份** — 来自请求体 `body.user`，未经签名验证（⚠️ 试运行前需替换为 token 验证）
 2. **默认用户** — 未传 user 时使用 `ANON_USER` (role=supervisor)（⚠️ 试运行前需降级为最低权限）
-3. **SQL Server** — 内网直连，encrypt=false。假设网络层已隔离
+3. **SQL Server** — ✅ 只读账号 `comm_plm_prd`，encrypt=false，内网直连
 4. **LLM 输出** — LLM 文本输出不可信（可能幻觉），关键数据强制通过 tool 返回
+5. **LLM 配置** — 通过 `deploy/models.json` 自定义 provider（Bailian 百炼），不入 pi-ai 框架内置列表
+6. **Docker 网络** — web 容器通过 Next.js rewrites 代理 /api/chat 和 /api/sessions 至 agent，浏览器不直连 agent
+
+## 数据流：生产看板
+
+```
+用户: 打开 /dashboard 页面
+  │
+  ▼
+Next.js GET /api/dashboard
+  │ 服务端 fetchAllDashboardOrders(30)
+  ├── 尝试 SQL Server（4 个基地并行）
+  │   └── 通达 → 返回真实生产数据
+  │   └── 不通 → catch
+  │       └── Prisma SQLite（降级 seed 数据）
+  ▼
+计算: 按基地分组 → KPI 汇总 → 逾期/预警 → Top 5
+  │
+  ▼
+JSON → React 组件 (DashboardKpiCards / BaseOrderCard / DeliveryWarnings)
+```
 
 ## 数据流：订单查询
 
@@ -232,3 +291,7 @@ SQL Server → recordset → {base, rows, found}
 - [permissions（权限模型）](permissions（权限模型）.md) — 角色矩阵与访问控制
 - [variables（环境变量）](variables（环境变量）.md) — 配置与密钥清单
 - [automation（Agent 自动化）](automation（Agent自动化）.md) — Agent 工具面与护栏
+- [tests（测试覆盖）](tests（测试覆盖）.md) — 测试覆盖矩阵与 CI 建议
+- [docker-lessons（Docker部署经验总结）](../reports/docker-lessons（Docker部署经验总结）.md) — 部署踩坑全记录
+- [PRD（产品需求文档）](../reports/PRD（产品需求文档）.md) — 产品需求文档
+- [shipping-packet（上线检查包）](../reports/shipping-packet（上线检查包）.md) — 安全+性能+测试综合审查

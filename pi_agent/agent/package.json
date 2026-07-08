@@ -7,6 +7,9 @@
   "exports": {
     ".": "./index.ts"
   },
+  "bin": {
+    "production-agent": "../acp/cli.ts"
+  },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",

@@ -42,7 +42,7 @@ async function main() {
     "*",
     cors({
       origin: "*",
-      allowMethods: ["GET", "POST", "OPTIONS"],
+      allowMethods: ["GET", "POST", "DELETE", "PATCH", "OPTIONS"],
       allowHeaders: ["Content-Type"],
     }),
   );

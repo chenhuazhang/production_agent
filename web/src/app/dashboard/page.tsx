@@ -107,10 +107,10 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center bg-[#faf8f5]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3" />
-          <p className="text-gray-500">加载生产数据中...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#8b7fc7] mx-auto mb-3" />
+          <p className="text-[#8a8599]">加载生产数据中...</p>
         </div>
       </div>
     );
@@ -118,10 +118,10 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center bg-[#faf8f5]">
         <div className="text-center">
           <p className="text-red-500 mb-2">加载失败</p>
-          <p className="text-sm text-gray-500">{error}</p>
+          <p className="text-sm text-[#8a8599]">{error}</p>
         </div>
       </div>
     );
@@ -134,12 +134,12 @@ export default function DashboardPage() {
   const { summary, bases, warnings } = data;
 
   return (
-    <div className="flex-1 p-8 overflow-auto">
+    <div className="flex-1 p-8 overflow-auto bg-[#faf8f5]">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold">生产执行看板</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-[#1a1a2e]">生产执行看板</h1>
+            <p className="text-sm text-[#8a8599] mt-1">
               五大基地生产状态总览 — 订单进度、工序分布、异常预警一屏看全局
             </p>
           </div>

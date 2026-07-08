@@ -19,10 +19,10 @@ export function CapacityChart({ bases }: { bases: BaseCapacity[] }) {
   return (
     <div className="space-y-4">
       {bases.map((base) => (
-        <Card key={base.base_name}>
+        <Card className="border-[#e8e4dd] bg-white">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">{base.base_name}</CardTitle>
+              <CardTitle className="text-base text-[#1a1a2e]">{base.base_name}</CardTitle>
               <Badge className={`${getLoadBg(base.load_rate)} ${getLoadColor(base.load_rate)} border-0`}>
                 {getLoadLabel(base.load_rate)}
               </Badge>
@@ -31,13 +31,13 @@ export function CapacityChart({ bases }: { bases: BaseCapacity[] }) {
           <CardContent>
             {/* Load rate bar */}
             <div className="mb-3">
-              <div className="flex justify-between text-xs text-gray-500 mb-1">
+              <div className="flex justify-between text-xs text-[#8a8599] mb-1">
                 <span>负荷率</span>
                 <span className={`font-bold ${getLoadColor(base.load_rate)}`}>
                   {base.load_rate}%
                 </span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
+              <div className="w-full bg-[#e8e4dd] rounded-full h-3">
                 <div
                   className={`h-3 rounded-full transition-all ${getLoadBarColor(base.load_rate)}`}
                   style={{ width: `${Math.min((base.load_rate / maxLoad) * 100, 100)}%` }}
@@ -48,22 +48,22 @@ export function CapacityChart({ bases }: { bases: BaseCapacity[] }) {
             {/* Metrics grid */}
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-500">日产能</span>
-                <span className="font-medium">{base.daily_capacity} 单</span>
+                <span className="text-[#8a8599]">日产能</span>
+                <span className="font-medium text-[#1a1a2e]">{base.daily_capacity} 单</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">待处理</span>
-                <span className="font-medium">{base.pending_orders} 单</span>
+                <span className="text-[#8a8599]">待处理</span>
+                <span className="font-medium text-[#1a1a2e]">{base.pending_orders} 单</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">负荷倍数</span>
+                <span className="text-[#8a8599]">负荷倍数</span>
                 <span className={`font-medium ${getLoadColor(base.load_rate)}`}>
                   {base.overload_multiplier}x
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">完工天数</span>
-                <span className="font-medium">{base.days_to_complete} 天</span>
+                <span className="text-[#8a8599]">完工天数</span>
+                <span className="font-medium text-[#1a1a2e]">{base.days_to_complete} 天</span>
               </div>
             </div>
           </CardContent>

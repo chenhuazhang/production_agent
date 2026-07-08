@@ -102,15 +102,15 @@ export function BaseOrderCard({
   const totalExceptions = extrusionExceptions + injectionStripExceptions + injectionColorPlateExceptions;
 
   return (
-    <Card>
+    <Card className="border-[#e8e4dd] bg-white hover:shadow-md transition-shadow">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CardTitle className="text-base">{name}</CardTitle>
-            <Badge variant="outline" className="text-xs font-normal">
+            <CardTitle className="text-base text-[#1a1a2e]">{name}</CardTitle>
+            <Badge variant="outline" className="text-xs font-normal text-[#8a8599] border-[#e8e4dd]">
               {dataSource}
             </Badge>
-            <span className="text-xs text-gray-400">{location}</span>
+            <span className="text-xs text-[#b5b0c4]">{location}</span>
           </div>
           <div className="flex items-center gap-1.5">
             {urgentCount > 0 && (
@@ -143,11 +143,11 @@ export function BaseOrderCard({
       <CardContent className="space-y-3">
         {/* Load rate bar */}
         <div>
-          <div className="flex justify-between text-xs text-gray-500 mb-1">
+          <div className="flex justify-between text-xs text-[#8a8599] mb-1">
             <span>负荷率</span>
             <span className={`font-bold ${getLoadColor(loadRate)}`}>{loadRate}%</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2.5">
+          <div className="w-full bg-[#e8e4dd] rounded-full h-2.5">
             <div
               className={`h-2.5 rounded-full transition-all ${getLoadBarColor(loadRate)}`}
               style={{ width: `${Math.min(loadRate, 100)}%` }}
@@ -158,20 +158,20 @@ export function BaseOrderCard({
         {/* Metrics grid */}
         <div className="grid grid-cols-4 gap-2 text-xs">
           <div className="text-center">
-            <p className="text-gray-500">订单</p>
-            <p className="font-bold text-blue-600">{orderCount}</p>
+            <p className="text-[#8a8599]">订单</p>
+            <p className="font-bold text-[#8b7fc7]">{orderCount}</p>
           </div>
           <div className="text-center">
-            <p className="text-gray-500">日产能</p>
-            <p className="font-bold">{dailyCapacity}单</p>
+            <p className="text-[#8a8599]">日产能</p>
+            <p className="font-bold text-[#1a1a2e]">{dailyCapacity}单</p>
           </div>
           <div className="text-center">
-            <p className="text-gray-500">负荷倍数</p>
+            <p className="text-[#8a8599]">负荷倍数</p>
             <p className={`font-bold ${getLoadColor(loadRate)}`}>{overloadMultiplier}x</p>
           </div>
           <div className="text-center">
-            <p className="text-gray-500">完工天数</p>
-            <p className="font-bold">{daysToComplete}天</p>
+            <p className="text-[#8a8599]">完工天数</p>
+            <p className="font-bold text-[#1a1a2e]">{daysToComplete}天</p>
           </div>
         </div>
 
@@ -207,10 +207,10 @@ export function BaseOrderCard({
         {/* Process stage distribution */}
         {processDistribution.length > 0 && (
           <div>
-            <p className="text-xs font-medium text-gray-500 mb-1.5">
+            <p className="text-xs font-medium text-[#8a8599] mb-1.5">
               工序分布
               {!hasProcessData && (
-                <span className="text-gray-400 ml-1">
+                <span className="text-[#b5b0c4] ml-1">
                   （{dataSource === "小试" ? "6道工序" : dataSource === "OA辅助单" ? "简化流程" : ""}）
                 </span>
               )}
@@ -222,11 +222,11 @@ export function BaseOrderCard({
         {/* Recent orders table */}
         {recentOrders.length > 0 && (
           <div>
-            <p className="text-xs font-medium text-gray-500 mb-1.5">活跃订单</p>
+            <p className="text-xs font-medium text-[#8a8599] mb-1.5">活跃订单</p>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-gray-400 border-b">
+                  <tr className="text-[#b5b0c4] border-b border-[#e8e4dd]">
                     <th className="text-left py-1 pr-2">单号</th>
                     <th className="text-left py-1 pr-2">产品</th>
                     <th className="text-left py-1 pr-2">机台</th>
@@ -236,28 +236,28 @@ export function BaseOrderCard({
                   </tr>
                 </thead>
                 <tbody>
-                  {recentOrders.map((o) => {
+                  {recentOrders.map((o, idx) => {
                     const hasAnyEx = o.extrusionException || o.injectionStripException || o.injectionColorPlateException;
                     return (
-                      <tr key={`${o.orderNo}-${o.machine || ''}`} className="border-b border-gray-50">
-                        <td className="py-1 pr-2 font-mono text-gray-600">
+                      <tr key={`${o.orderNo}-${o.machine || ''}-${idx}`} className="border-b border-[#f5f2ed]">
+                        <td className="py-1 pr-2 font-mono text-[#6b6b7b]">
                           {o.priority === "urgent" && <Zap className="h-3 w-3 inline text-red-500 mr-0.5" />}
-                          {hasAnyEx && <AlertCircle className="h-3 w-3 inline text-orange-500 mr-0.5" />}
+                          {hasAnyEx && <AlertCircle className="h-3 w-3 inline text-[#d4a373] mr-0.5" />}
                           {o.orderNo}
                         </td>
-                        <td className="py-1 pr-2 truncate max-w-[80px]" title={o.productName}>
+                        <td className="py-1 pr-2 truncate max-w-[80px] text-[#4a4a5a]" title={o.productName}>
                           {o.productName}
                         </td>
-                        <td className="py-1 pr-2 text-gray-500 font-mono">
+                        <td className="py-1 pr-2 text-[#8a8599] font-mono">
                           {o.machine || "-"}
                         </td>
-                        <td className="py-1 pr-2 truncate max-w-[60px]" title={o.currentStage ?? ""}>
+                        <td className="py-1 pr-2 truncate max-w-[60px] text-[#4a4a5a]" title={o.currentStage ?? ""}>
                           {o.currentStage || "-"}
                         </td>
                         <td className={`py-1 pr-2 ${
                           isOverdue(o.plannedDate) ? "text-red-600 font-bold" :
-                          isDueSoon(o.plannedDate) ? "text-amber-600 font-medium" :
-                          "text-gray-500"
+                          isDueSoon(o.plannedDate) ? "text-[#d4a373] font-medium" :
+                          "text-[#8a8599]"
                         }`}>
                           {formatDate(o.plannedDate)}
                           {isOverdue(o.plannedDate) && " ⚠"}
