@@ -1,0 +1,52 @@
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: production-agent-server
+    network_mode: host
+    env_file:
+      - deploy/.env
+    environment:
+      - NODE_ENV=production
+      - PORT=8000
+      - NODE_OPTIONS=--max-old-space-size=4096
+    volumes:
+      - agent-sessions:/root/.pi
+      - agent-traces:/app/data/logs/traces
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8000/health',r=>{process.exit(r.statusCode===200?0:1)})"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        - DATABASE_URL=postgresql://kingfa_ai:KingfaAI%402024@172.18.26.74:15432/agent
+    container_name: production-agent-web
+    network_mode: host
+    env_file:
+      - deploy/.env
+    environment:
+      - NODE_ENV=production
+      - AI_API_URL=http://localhost:8000
+      - DATABASE_URL=postgresql://kingfa_ai:KingfaAI%402024@172.18.26.74:15432/agent
+    depends_on:
+      agent:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000',r=>{process.exit(r.statusCode===200?0:1)})"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  agent-sessions:
+  agent-traces:
