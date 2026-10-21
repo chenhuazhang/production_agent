@@ -42,6 +42,10 @@ data/logs/
 server/data/
 pi_agent/acp-debug.log
 pi_agent/acp/
+*.log
+
+# pi-agent 运行时目录（会话 JSONL / 模型配置缓存，不入库）
+.pi/
 
 # Generated
 src/generated/

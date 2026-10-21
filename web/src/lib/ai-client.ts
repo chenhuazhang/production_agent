@@ -4,13 +4,13 @@
  * 消费 pi-coding-agent 的 SSE 事件流。
  * 事件类型：text_delta / tool_start / tool_end / done / error
  *
- * URL 由 env AI_API_URL 配置，向后兼容 PYTHON_API_URL，默认 http://localhost:8000
+ * URL 由 env AI_API_URL 配置，向后兼容 PYTHON_API_URL，默认 http://127.0.0.1:8001
  */
 
 // 服务端用内网地址，浏览器用相对路径（走 Next.js 代理）
 const AI_API_URL =
   typeof window === "undefined"
-    ? (process.env.AI_API_URL || process.env.PYTHON_API_URL || "http://localhost:8000")
+    ? (process.env.AI_API_URL || process.env.PYTHON_API_URL || "http://127.0.0.1:8001")
     : "";
 
 export interface ChatRequest {
@@ -28,6 +28,8 @@ export interface StreamHandlers {
   onToolEnd?: (toolName: string, isError: boolean, result: unknown) => void;
   onDone?: () => void;
   onError?: (message: string) => void;
+  /** 服务端回传的持久化会话 id（首条消息后用于绑定真实会话） */
+  onSessionId?: (sessionId: string) => void;
 }
 
 /**
@@ -47,6 +49,12 @@ export async function sendChatMessageStream(
 
   if (!response.ok) {
     throw new Error(`AI service error: ${response.status} ${response.statusText}`);
+  }
+
+  // 服务端回传持久化会话 id（响应头），供前端首条消息后绑定真实会话
+  const headerSessionId = response.headers.get("X-Session-Id");
+  if (headerSessionId) {
+    handlers.onSessionId?.(headerSessionId);
   }
 
   const reader = response.body?.getReader();

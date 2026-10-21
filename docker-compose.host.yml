@@ -12,7 +12,7 @@ services:
       - PORT=8000
       - NODE_OPTIONS=--max-old-space-size=4096
     volumes:
-      - agent-sessions:/root/.pi
+      - agent-sessions:/app/.pi
       - agent-traces:/app/data/logs/traces
     restart: unless-stopped
     healthcheck:

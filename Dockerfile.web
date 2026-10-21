@@ -38,6 +38,11 @@ WORKDIR /app/web
 RUN npx prisma generate
 
 WORKDIR /app
+# AI_API_URL 必须在构建期注入：Next.js 的 rewrites() 目标在 next build 时
+# 固化进 .next/routes-manifest.json，next start 只读 manifest 不再重算，
+# 运行时设置 AI_API_URL 对 /api/chat、/api/sessions 代理无效。
+ARG AI_API_URL=http://agent:8000
+ENV AI_API_URL=$AI_API_URL
 RUN npm run build --workspace=web
 
 # ── 运行层 ──────────────────────

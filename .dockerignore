@@ -1,7 +1,6 @@
 # 密钥和配置
-.env
-.env.*
-!pi_agent/.env
+**/.env
+**/.env.*
 *.pem
 *.key
 
@@ -40,7 +39,6 @@ docs/
 reports/
 documentation/
 README.md
-AGENTS.md
 CLAUDE.md
 
 # Claude / Superpowers

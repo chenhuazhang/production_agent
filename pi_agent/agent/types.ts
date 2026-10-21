@@ -17,6 +17,10 @@ export interface AgentConfig {
   model?: string;
   /** 额外的 Skills */
   skills?: Skill[];
+  /** 恢复已有会话文件（绝对路径）续聊；缺省则新建会话 */
+  sessionFile?: string;
+  /** 注入系统提示的业务范围说明（MaxKB 多智能体分流用），空串/缺省 = 不注入 */
+  scopeNote?: string;
 }
 
 export interface EnvConfig {

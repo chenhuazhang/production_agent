@@ -5,7 +5,7 @@
  * 遵循最小权限原则：任何人都不可修改生产数据。
  *
  * 用法（每个工具 execute 开头）：
- *   const result = checkPermission("query_order_progress", { base_name: "中试广州" });
+ *   const result = checkPermission("query_order_progress", { base_name: "广州工艺实验" });
  *   if (!result.allowed) return textResult({ error: result.reason });
  */
 
@@ -51,6 +51,21 @@ const TOOL_PERMISSIONS: Record<string, ToolPermission> = {
     allowRoles: ["sales", "engineer", "planner", "supervisor"],
     paramCheck: (user, args) => {
       // 计划岗只能查本基地
+      if (user.role === "planner" && user.baseId) {
+        const targetBase = args.base as string | undefined;
+        if (targetBase && targetBase !== user.baseId) {
+          return { allowed: false, reason: `无权查询 ${targetBase} 数据，您归属 ${user.baseId}` };
+        }
+      }
+      return { allowed: true };
+    },
+  },
+
+  // ── 订单列表查询（多维） ──
+  query_orders_list: {
+    allowRoles: ["sales", "engineer", "planner", "supervisor"],
+    paramCheck: (user, args) => {
+      // 计划岗只能查本基地（与 query_order_progress 相同；baseId 编码不一致为已知问题）
       if (user.role === "planner" && user.baseId) {
         const targetBase = args.base as string | undefined;
         if (targetBase && targetBase !== user.baseId) {

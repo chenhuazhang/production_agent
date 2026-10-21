@@ -18,21 +18,40 @@ import type { Skill, SourceInfo } from "@earendil-works/pi-coding-agent";
  * 支持多供应商：deepseek / openai / qwen / anthropic / google …
  */
 export function getEnvConfig(): EnvConfig {
-  const provider = (process.env.AI_PROVIDER || "deepseek").trim().toLowerCase();
+  const provider = (process.env.AI_PROVIDER || "bailian").trim().toLowerCase();
   const apiKey = process.env.AI_API_KEY?.trim();
-  const model = (process.env.AI_MODEL || "deepseek-v4-flash").trim();
+  const model = (process.env.AI_MODEL || "qwen3.8-max").trim();
 
   if (!apiKey) {
     throw new Error(
       "缺少 AI_API_KEY 环境变量。\n" +
       "请在 pi_agent/.env 中设置:\n" +
-      "  AI_PROVIDER=deepseek\n" +
+      "  AI_PROVIDER=bailian\n" +
       "  AI_API_KEY=your-api-key\n" +
-      "  AI_MODEL=deepseek-v4-flash  # 可选\n",
+      "  AI_MODEL=qwen3.8-max  # 可选\n",
     );
   }
 
   return { provider, apiKey, model };
+}
+
+/**
+ * 模型降级链（同一端点 / 同一 Key，各模型独立免费额度）。
+ *
+ * 顺序：AI_MODEL（主模型）→ AI_MODEL_FALLBACKS（逗号分隔，依次降级）。
+ * 额度用尽时按序切换，全部用尽才报错。
+ * 注意：deepseek-v4-flash 已弃用，不在降级链中。
+ */
+export function getModelFallbackChain(): string[] {
+  const primary = (process.env.AI_MODEL || "qwen3.8-max").trim();
+  const fallbacks = (process.env.AI_MODEL_FALLBACKS || "glm-5.2,qwen3.7-max")
+    .split(",")
+    .map((m) => m.trim())
+    .filter(Boolean);
+
+  const chain = [primary, ...fallbacks];
+  // 去重（保留首次出现），避免死循环
+  return [...new Set(chain)];
 }
 
 // ============================================

@@ -11,7 +11,7 @@ const prisma = new PrismaClient({ adapter });
 const GZ_PERSONNEL = {
   开单: "王武龙",
   排产: "杨东东",
-  色粉计量: "丘文彬",
+  色粉计量: "冉海淘/贺建平",
   混料: "邹华明",
   挤出: "邹华明",
   注塑色板: "刘富贵",

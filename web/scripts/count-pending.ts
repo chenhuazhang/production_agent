@@ -29,8 +29,8 @@ async function main() {
   const r3 = await p.request().input("s", sql.NVarChar, since)
     .query(`SELECT f102925 AS base,
         COUNT(*) as total,
-        SUM(CASE WHEN f102967 <= '1900-01-02' THEN 1 ELSE 0 END) as pending,
-        SUM(CASE WHEN f102967 > '1900-01-02' THEN 1 ELSE 0 END) as completed
+        SUM(CASE WHEN f102963 <= '1900-01-02' THEN 1 ELSE 0 END) as pending,
+        SUM(CASE WHEN f102963 > '1900-01-02' THEN 1 ELSE 0 END) as completed
       FROM tabdiytable5992 WHERE f102959 > @s
       GROUP BY f102925 ORDER BY f102925`);
   console.log("\n小试 (by base):");

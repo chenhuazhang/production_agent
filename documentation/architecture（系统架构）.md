@@ -11,10 +11,10 @@
 | 层级 | 技术 | 作用 |
 |-------|-----------|------|
 | Agent 框架 | `@earendil-works/pi-coding-agent` | LLM 调度、工具定义、会话管理、上下文压缩 |
-| AI 模型 | `@earendil-works/pi-ai` + `~/pi/agent/models.json` | 多供应商模型抽象（内置: DeepSeek / OpenAI / Qwen / Anthropic / Google；自定义: Bailian 百炼 → GLM-5.2） |
+| AI 模型 | `@earendil-works/pi-ai` + `~/pi/agent/models.json` | 多供应商模型抽象（内置: DeepSeek / OpenAI / Qwen / Anthropic / Google；自定义: Bailian 百炼 → Qwen3.8-Max，GLM-5.2 额度用尽后切换） |
 | 后端服务 | Hono (Node.js) | HTTP + SSE 路由、Session 生命周期管理 |
 | 前端 | Next.js (App Router) | 聊天界面、生产看板、SSE 消费 |
-| 业务数据库 | SQL Server (mssql) | 中试生产管理 ERP 数据库，4 个业务范围 |
+| 业务数据库 | SQL Server (mssql) | 中试生产管理 ERP 数据库，5 个业务范围 |
 | 本地数据库 | SQLite (Prisma) | 前端本地看板数据缓存、基地/订单 seed 数据 |
 | 会话存储 | JSONL 文件 (`~/.pi/agent/sessions/`) | 对话持久化、历史回溯、分支/fork |
 
@@ -160,7 +160,7 @@ agent ──HTTPS──▶ LLM API (Bailian 百炼 / 阿里云)
 | `.dockerignore` | 排除 node_modules/.git/文档/测试，保留 pi_agent/.env | ✅ |
 | `deploy/.env` | 生产环境变量（AI key / SQL 密码等） | ❌ `.gitignore` |
 | `deploy/.env.production` | 环境变量模板（占位值） | ✅ |
-| `deploy/models.json` | 百炼 bailian provider + GLM-5.2 模型定义 | ✅ |
+| `deploy/models.json` | 百炼 bailian provider + Qwen3.8-Max / GLM-5.2 模型定义 | ✅ |
 | `deploy/nginx.conf` | Nginx 反代 + SSL 配置模板 | ✅ |
 
 ### 健康检查
@@ -242,7 +242,7 @@ docker cp deploy/models.json 容器名:/root/.pi/agent/models.json
   ▼
 Next.js GET /api/dashboard
   │ 服务端 fetchAllDashboardOrders(30)
-  ├── 尝试 SQL Server（4 个基地并行）
+  ├── 尝试 SQL Server（5 个数据源）
   │   └── 通达 → 返回真实生产数据
   │   └── 不通 → catch
   │       └── Prisma SQLite（降级 seed 数据）
@@ -267,13 +267,13 @@ LLM 决策: 调用 query_order_progress({order_no: "ZS-2026-001"})
   ▼
 Agent 执行 queryOrderProgressTool
   │ checkPermission("query_order_progress", params)  ← ALS 用户上下文
-  │ queryOrderProgress(orderNo) → Promise.all(4 个基地)
+  │ queryOrderProgress(orderNo) → Promise.all(5 个业务类型)
   ▼
 SQL Server → recordset → {base, rows, found}
   │
   ▼
 工具结果 → LLM 格式化回复 → SSE 流 → 浏览器
-  text_delta: "订单 ZS-2026-001 在广州中试..."
+  text_delta: "订单 ZS-2026-001 在广州送样&小订单..."
   tool_start / tool_end: query_order_progress
   done: {}
 ```

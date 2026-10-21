@@ -35,6 +35,8 @@ interface SessionCtx {
   pinSession: (id: string, pinned?: boolean) => Promise<boolean>;
   /** 刷新历史列表 */
   refresh: () => void;
+  /** 采用服务端返回的真实会话 id（首条消息后绑定，避免 sess- 临时 id 分裂） */
+  adoptSession: (id: string) => void;
 }
 
 const SessionContext = createContext<SessionCtx | null>(null);
@@ -116,9 +118,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const refresh = refreshList;
 
+  /** 采用服务端返回的真实会话 id 并持久化到 localStorage（首条消息后绑定） */
+  const adoptSession = useCallback((id: string) => {
+    if (!id) return;
+    setSessionId(id);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, id);
+    }
+  }, []);
+
   return (
     <SessionContext.Provider
-      value={{ sessionId, sessionList, loading, mounted, switchSession, newSession, deleteSession, renameSession, pinSession, refresh }}
+      value={{ sessionId, sessionList, loading, mounted, switchSession, newSession, deleteSession, renameSession, pinSession, refresh, adoptSession }}
     >
       {children}
     </SessionContext.Provider>

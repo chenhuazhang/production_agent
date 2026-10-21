@@ -5,11 +5,11 @@
  * GET /api/sessions/:sessionId   — 单会话消息详情
  */
 
-// 服务端用内网地址，浏览器直连后端（后端已开启 CORS）
+// 服务端用内网地址，浏览器用相对路径（走 Next.js rewrites 代理）
 const API_URL =
   typeof window === "undefined"
-    ? (process.env.AI_API_URL || process.env.PYTHON_API_URL || "http://localhost:8000")
-    : (process.env.NEXT_PUBLIC_AI_API_URL || process.env.NEXT_PUBLIC_PYTHON_API_URL || "http://localhost:8000");
+    ? (process.env.AI_API_URL || process.env.PYTHON_API_URL || "http://127.0.0.1:8001")
+    : "";
 
 export interface SessionListItem {
   id: string;

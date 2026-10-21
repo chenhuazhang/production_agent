@@ -14,6 +14,7 @@
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
+import type { BaseName } from "./sqlServer.js";
 
 // ============================================
 // 类型
@@ -28,6 +29,11 @@ export interface UserContext {
   role: UserRole;
   /** 所属基地 ID（计划岗有归属基地限制；主管为 null 表示全部基地） */
   baseId: string | null;
+  /**
+   * 允许查询的业务类型范围（MaxKB 多智能体按模型名分流用）。
+   * undefined = 不限制（全部 5 类）。查单工具会把查询范围钳制到此列表。
+   */
+  allowedBusinessTypes?: BaseName[];
 }
 
 // ============================================

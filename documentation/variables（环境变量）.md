@@ -8,9 +8,10 @@
 
 | 变量 | 必填 | 默认值 | 风险 | 轮换策略 | 说明 |
 |----------|----------|---------|------------|----------|-------|
-| `AI_PROVIDER` | 是 | `deepseek` | 低 | N/A | 供应商标识：deepseek / openai / qwen / anthropic / google |
+| `AI_PROVIDER` | 是 | `bailian` | 低 | N/A | 供应商标识（当前阿里云百炼专属端点 bailian） |
 | `AI_API_KEY` | **是** | — | **高** | 泄露时立即轮换 | LLM API 密钥。缺失时服务启动崩溃 |
-| `AI_MODEL` | 否 | `deepseek-v4-flash` | 低 | N/A | 各供应商约定的模型名称 |
+| `AI_MODEL` | 否 | `qwen3.8-max` | 低 | N/A | 主模型名（各模型独立免费额度） |
+| `AI_MODEL_FALLBACKS` | 否 | `glm-5.2,qwen3.7-max` | 低 | N/A | 模型降级链（逗号分隔）。主模型额度用尽时按序切换，同端点同 Key；`deepseek-v4-flash` 已弃用，不入链 |
 
 ### SQL Server 配置
 
@@ -28,6 +29,7 @@
 |----------|----------|---------|------------|-------|
 | `PORT` | 否 | `8000` | 低 | Hono 服务端口 |
 | `CORS_ORIGIN` | 否 | （未设置，默认 `*`） | 中 | 生产环境应设置为前端域名 |
+| `OPEN_API_KEY` | 外部接口需要 | — | **高** | `/open/*` 对外接口 Bearer 鉴权；未配置时 fail-closed 返回 503；泄露时立即轮换 |
 
 ### Web（Next.js）配置
 
@@ -43,6 +45,7 @@
 |--------|---------|---------------|------------|
 | `AI_API_KEY` | `pi_agent/.env`（gitignored） | 若提交到 git 或打入 Docker 镜像 | `.gitignore` 检查；`.dockerignore` 检查；Docker secrets |
 | `SQL_PASSWORD` | `pi_agent/.env`（gitignored） | 泄露 | 只读账号 `comm_plm_prd`；Docker secrets |
+| `OPEN_API_KEY` | `pi_agent/.env`（gitignored） | 泄露 = 外部可访问订单进度数据 | fail-closed 默认；与 SYNC_API_KEY 隔离；泄露立即轮换 |
 | LLM API 响应 | 内存（AgentSession） | 内存 dump | Session 30min TTL 清理 |
 
 ### 部署：Docker

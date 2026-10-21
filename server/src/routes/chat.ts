@@ -11,8 +11,9 @@ import { streamSSE } from "hono/streaming";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { SessionStore } from "../services/sessionStore";
 import { createLogger } from "../services/logger";
-import { runWithUser, type UserContext } from "pi-agent";
+import { runPromptWithModelFallback, type UserContext } from "pi-agent";
 import { ExecutionTracer } from "../services/executionTracer";
+import { REPLY_FOOTER } from "../services/replyFooter";
 
 const logger = createLogger("chat");
 const tracer = new ExecutionTracer();
@@ -104,36 +105,60 @@ export function chatRoute(store: SessionStore) {
     }
     store.setBusy(sessionId, true);
 
+    // 返回持久化会话 id：首条消息后前端用它替换 sess- 临时 id，避免会话分裂
+    const persistedId = entry.session.sessionManager.getSessionId();
+    if (persistedId) c.header("X-Session-Id", persistedId);
+
     const user = body.user ?? ANON_USER;
 
     return streamSSE(c, async (stream) => {
-      let unsubscribe: (() => void) | null = null;
       const traceId = tracer.start(sessionId, text, user);
+      // 幂等保护：单次请求只补一次页脚（框架重试可能导致 agent_end 触发多次）
+      let footerSent = false;
       try {
-        unsubscribe = entry.session.subscribe((raw) => {
-          // 喂给 tracer（结构化日志持久化）
-          tracer.record(raw, traceId);
+        logger.info("Executing prompt", { sessionId, textLength: text.length });
+        // 带模型降级执行：主模型额度用尽自动切下一个模型（同端点同 Key），
+        // 失败回合的 error / agent_end 事件会被过滤，不推送前端。
+        const result = await runPromptWithModelFallback({
+          session: entry.session,
+          text,
+          user,
+          modelChain: entry.modelChain,
+          onEvent: (raw) => {
+            // 喂给 tracer（结构化日志持久化）
+            tracer.record(raw, traceId);
 
-          // 喂给 SSE（实时推送前端）
-          const sse = transformAgentEvent(raw);
-          if (sse) {
+            // 喂给 SSE（实时推送前端）
+            const sse = transformAgentEvent(raw);
+            if (!sse) return;
+
+            // agent_end 到达 = 本轮回复成功结束（降级失败回合的 agent_end 已被执行器过滤）。
+            // 在推 done 之前补一条反馈页脚 text_delta，保证每条成功回复末尾都带反馈表链接。
+            // 注意：页脚只发前端显示，不写回 session（会话历史里不含这句话）。
+            if (raw.type === "agent_end" && !footerSent) {
+              footerSent = true;
+              stream.writeSSE({ event: "text_delta", data: JSON.stringify({ delta: `\n\n${REPLY_FOOTER}` }) });
+            }
+
             stream.writeSSE({ event: sse.event, data: JSON.stringify(sse.data) });
             logger.sseEvent(sessionId, sse.event);
-          }
+          },
         });
 
-        logger.info("Executing prompt", { sessionId, textLength: text.length });
-        // 👇 权限上下文：工具执行时通过 ALS 读取用户身份
-        await runWithUser(user, () => entry.session.prompt(text));
-        tracer.finish(traceId);
-        logger.response(sessionId, Date.now() - startTime);
+        if (result.status === "error") {
+          tracer.error(traceId, result.message);
+          logger.error("Prompt execution failed", { sessionId, error: result.message });
+          await stream.writeSSE({ event: "error", data: JSON.stringify({ message: result.message }) });
+        } else {
+          tracer.finish(traceId);
+          logger.response(sessionId, Date.now() - startTime);
+        }
       } catch (error) {
         const msg = error instanceof Error ? error.message : "Unknown error";
         tracer.error(traceId, msg);
         logger.error("Prompt execution failed", { sessionId, error: msg });
         await stream.writeSSE({ event: "error", data: JSON.stringify({ message: msg }) });
       } finally {
-        if (unsubscribe) unsubscribe();
         store.setBusy(sessionId, false);
         logger.debug("Session released", { sessionId });
       }

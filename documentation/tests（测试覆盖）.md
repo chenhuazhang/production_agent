@@ -19,7 +19,7 @@
 | **数据完整性** |
 | D1 | SQL 查询参数化防注入 | [automation.md] @orderNo 绑定 | order_no 含 SQL 注入尝试 → 不泄露数据 | sqlServer.ts:296 | unit | 待写 |
 | D2 | SQL 失败回退 mock + 明确标注 | [flows.md] SQL error → mock + 标注 | SQL 连接被拒 → 返回 mock 数据并标注"模拟数据" | tools.ts:90-98 | unit | 待写 |
-| D3 | 并行查询 4 个基地（未指定 base） | [flows.md] no base → Promise.all(4) | `queryOrderProgressMany("X001")` → 4 个并发查询 | sqlServer.ts:317 | integration | 待写 |
+| D3 | 并行查询 5 个业务类型（未指定 base） | [flows.md] no base → Promise.all(5) | `queryOrderProgressMany("X001")` → 5 个并发查询 | sqlServer.ts:317 | integration | 待写 |
 | D4 | 订单不存在时友好提示 | [flows.md] not found → hint | `queryOrderProgress("NONEXIST", base)` → `{found:false, error:"未找到"}` | tools.ts:67-69 | unit | 待写 |
 | D5 | 产能公式正确 | [flows.md] 日产能 = 台数 × 单台产量 | `calculateDailyCapacity(12, 8)` → 96 | capacity.ts:40-46 | unit | 待写 |
 | D6 | 推荐选择负荷率最低基地 | [flows.md] 按 loadRate 排序 → 选最低 | `recommendBase([{load:80},{load:30},{load:60}])` → load=30 的基地 | capacity.ts:85-105 | unit | 待写 |
@@ -38,7 +38,7 @@
 | M2 | Busy flag 阻止并发请求 | [architecture.md] busy → 429 | Session isBusy=true → POST 返回 429 | chat.ts:90-93 | integration | 待写 |
 | M3 | Session 创建失败返回友好错误 | [flows.md] create fail → 500 + msg | 缺少 API Key → 500 JSON（不崩溃） | chat.ts:98-103 | integration | 待写 |
 | **性能（来自审计）** |
-| P1 | 看板查询并行化 | [perf audit 1.2] 并发查询 | `fetchAllDashboardOrders()` → 4 个查询同时发出 | web sqlServer.ts:296 | integration | 待写 |
+| P1 | 看板查询并行化 | [perf audit 1.2] 并发查询 | `fetchAllDashboardOrders()` → 5 个查询同时发出 | web sqlServer.ts:296 | integration | 待写 |
 | P2 | 同步 I/O 已替换为异步 | [perf audit 5.1] 无 fs.*Sync | `ExecutionTracer.persist()` 使用 fs.promises | executionTracer.ts:148 | unit | 待写 |
 
 ---
@@ -138,7 +138,7 @@ test: busy 标记阻止并发
 ```
 test: SQL 参数绑定而非拼接
   arrange: spy on pool.request().input()
-  act: queryOrderProgress("test'; DROP TABLE--", "中试广州")
+  act: queryOrderProgress("test'; DROP TABLE--", "广州工艺实验")
   assert: input() 被调用参数为 ("orderNo", NVarChar, "test'; DROP TABLE--")
          — 恶意 SQL 被当作字面字符串处理
 ```
@@ -188,7 +188,7 @@ test: Agent 缺信息时追问
   assert: 回复追问"请提供订单号"
 
 test: 订单查询返回 SQL Server 真实数据
-  act: prompt("查 ZS-2026-001 在中试广州的进度")
+  act: prompt("查 ZS-2026-001 在广州送样&小订单的进度")
   assert: tool_start → query_order_progress, text_delta 含订单详情
 ```
 

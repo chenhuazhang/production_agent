@@ -5,8 +5,11 @@ import { prisma } from "@/lib/prisma";
 // ── 工序定义 ──
 
 const PROCESS_STAGES: Record<string, string[]> = {
-  "广州中试": ["开单", "排产", "色粉计量", "混料", "挤出", "注塑色板", "注塑样条", "最终完成"],
-  "上海中试": ["排产", "色粉计量", "混料", "挤出", "注塑色板", "注塑样条", "最终完成"],
+  "广州工艺实验":    ["开单", "排产", "色粉计量", "混料", "挤出", "注塑色板", "注塑样条", "最终完成"],
+  "广州送样&小订单": ["开单", "排产", "色粉计量", "混料", "挤出", "注塑色板", "注塑样条", "最终完成"],
+  "广州中试": ["开单", "排产", "色粉计量", "混料", "挤出", "注塑色板", "注塑样条", "最终完成"], // 旧数据源名（兼容 seed/历史数据）
+  "上海中试": ["排产", "色粉计量", "混料", "挤出", "注塑色板", "注塑样条", "最终完成"], // 旧数据源名（兼容 seed/历史数据）
+  "上海工艺实验": ["排产", "色粉计量", "混料", "挤出", "注塑色板", "注塑样条", "最终完成"],
   "小试":     ["排产", "色粉计量", "混料", "挤出", "注塑样条", "最终完成"],
   "OA辅助单":  ["排产", "注塑样条", "最终完成"],
 };
@@ -104,7 +107,7 @@ export async function GET() {
           finalCompleteTime: o.status === "completed" ? o.deliveryDate.toISOString() : null,
           creator: null, schedulingPerson: null, colorPowderMeasurer: null,
           mixingPerson: null, extrusionPerson: null, injectionColorPlatePerson: null,
-          injectionStripPerson: null, finalMonitor: null,
+          injectionStripPerson: null, finalMonitor: null, technician: null,
         });
       }
     }
@@ -113,7 +116,7 @@ export async function GET() {
   const now = new Date();
   const warningThreshold = new Date(now.getTime() + 2 * 86400000);
 
-  // ── 按 baseName + dataSource 分组（广州中试 / 广州小试 分开） ──
+  // ── 按 baseName + dataSource 分组（广州工艺实验 / 广州送样&小订单 / 广州小试 分开） ──
   const groupMap = new Map<string, {
     name: string;
     displayName: string;
@@ -124,7 +127,10 @@ export async function GET() {
   for (const o of orders) {
     const key = `${o.baseName}|${o.dataSource}`;
     if (!groupMap.has(key)) {
-      const displayName = o.dataSource === "广州中试" ? "广州基地(中试)"
+      const displayName = o.dataSource === "广州工艺实验" ? "广州基地(工艺实验)"
+        : o.dataSource === "广州送样&小订单" ? "广州基地(送样&小订单)"
+        : o.dataSource === "上海工艺实验" ? "上海基地(工艺实验)"
+        : o.dataSource === "广州中试" ? "广州基地(中试)"
         : o.dataSource === "上海中试" ? "上海基地(中试)"
         : o.dataSource === "小试" ? `${o.baseName}(小试)`
         : `${o.baseName}(${o.dataSource})`;
@@ -170,7 +176,8 @@ export async function GET() {
       count: stageMap.get(name) || 0,
     }));
 
-    const hasProcessData = ds === "广州中试" || ds === "上海中试" || ds === "小试";
+    const hasProcessData = ds === "广州工艺实验" || ds === "广州送样&小订单" || ds === "广州中试"
+      || ds === "上海中试" || ds === "上海工艺实验" || ds === "小试";
 
     // Top 5 活跃订单（未完成的，按交期排序）
     const recentOrders = activeOrders
@@ -244,6 +251,7 @@ export async function GET() {
       const dd = determineDeliveryDate(o)!;
       return {
         orderNo: o.orderNo, productName: "", baseName: o.baseName,
+        dataSource: o.dataSource,
         plannedDate: dd,
         daysOverdue: Math.round((now.getTime() - new Date(dd).getTime()) / 86400000),
         status: isCompleted(o) ? "completed" as const : "in_progress" as const,

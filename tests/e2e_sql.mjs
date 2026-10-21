@@ -1,6 +1,6 @@
 // 端到端测试：SQL Server 真实查询
 const URL = "http://localhost:8000/api/chat/e2e-sql-01";
-const PROMPT = process.argv[2] || "帮我查一下 ZS-2026-001 在中试广州基地的生产进度";
+const PROMPT = process.argv[2] || "帮我查一下 ZS-2026-001 在广州送样&小订单的生产进度";
 
 async function run() {
   console.log(`>>> 发送: ${PROMPT}\n`);

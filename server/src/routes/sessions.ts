@@ -63,7 +63,7 @@ function cleanGarbledText(text: string): string {
 
 function toListItem(s: SessionInfo): SessionListItem {
   const cleanFirst = cleanGarbledText(s.firstMessage);
-  const cleanName = cleanGarbledText(s.name);
+  const cleanName = cleanGarbledText(s.name ?? "");
   const name = cleanName || cleanFirst.slice(0, 40) || "(新对话)";
   return {
     id: s.id,

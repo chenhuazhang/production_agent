@@ -6,6 +6,7 @@ interface WarningOrder {
   orderNo: string;
   productName: string;
   baseName: string;
+  dataSource?: string;
   plannedDate: string;
   daysOverdue: number; // positive = overdue, negative = days remaining
   status: string;
@@ -68,10 +69,11 @@ export function DeliveryWarnings({ warnings }: DeliveryWarningsProps) {
               </tr>
             </thead>
             <tbody>
-              {warnings.map((order) => {
+              {warnings.map((order, idx) => {
                 const isOverdue = order.daysOverdue > 0;
                 const hasException = order.extrusionException || order.injectionStripException || order.injectionColorPlateException;
-                const uniqueKey = `${order.orderNo}-${order.baseName}`;
+                // 含 dataSource：同一订单号理论上可能出现在不同数据源；再兜底 idx 防极端重复
+                const uniqueKey = `${order.orderNo}-${order.baseName}-${order.dataSource ?? ""}-${idx}`;
                 return (
                   <tr
                     key={uniqueKey}

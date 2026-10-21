@@ -22,8 +22,8 @@ async function main() {
       f102957 AS color_powder_measure_time,
       f102959 AS mixing_time,
       f102961 AS extrusion_time,
-      f102994 AS injection_strip_time,
-      f102967 AS final_complete_time
+      f102962 AS 注塑人员姓名,
+      f102963 AS 注塑完成时间
     FROM tabdiytable5992 WHERE f102935 = @o`);
 
   const row = r.recordset[0];

@@ -16,7 +16,7 @@ services:
       - SQL_HOST=host.docker.internal
     volumes:
       # Session JSONL 持久化（~/.pi/agent/sessions/）
-      - agent-sessions:/root/.pi
+      - agent-sessions:/app/.pi
       # Trace 日志持久化
       - agent-traces:/app/data/logs/traces
     restart: unless-stopped
@@ -33,6 +33,8 @@ services:
       dockerfile: Dockerfile.web
       args:
         - DATABASE_URL=postgresql://kingfa_ai:KingfaAI%402024@host.docker.internal:15432/agent
+        # 构建期注入：rewrite 目标固化进 manifest，运行时改不了
+        - AI_API_URL=http://agent:8000
     container_name: production-agent-web
     ports:
       - "80:3000"

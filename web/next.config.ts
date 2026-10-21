@@ -1,22 +1,20 @@
 import type { NextConfig } from "next";
 
+const AI_API_URL =
+  process.env.AI_API_URL || process.env.PYTHON_API_URL || "http://127.0.0.1:8001";
+
 const nextConfig: NextConfig = {
-  allowedDevOrigins: [
-    "http://172.19.155.196:3000",
-    "http://172.19.154.32:3000",
-    "http://172.19.152.86:3000",
-  ],
-  // 浏览器端 /api/chat 和 /api/sessions 转发到 agent 容器
-  // /api/dashboard、/api/bases、/api/capacity 由 Next.js 自己处理
   async rewrites() {
     return [
+      // Chat SSE 流式接口 → server (8001)
       {
         source: "/api/chat/:path*",
-        destination: `${process.env.AI_API_URL || "http://localhost:8000"}/api/chat/:path*`,
+        destination: `${AI_API_URL}/api/chat/:path*`,
       },
+      // 会话管理接口 → server (8001)
       {
         source: "/api/sessions/:path*",
-        destination: `${process.env.AI_API_URL || "http://localhost:8000"}/api/sessions/:path*`,
+        destination: `${AI_API_URL}/api/sessions/:path*`,
       },
     ];
   },

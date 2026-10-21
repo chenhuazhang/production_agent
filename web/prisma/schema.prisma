@@ -5,14 +5,13 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Base {
   id                    String             @id @default(cuid())
   name                  String
   location              String
-  dataSource            String             @default("小试") @map("data_source") // 广州中试 | 上海中试 | 小试 | OA辅助单
+  dataSource            String             @default("小试") @map("data_source") // 广州工艺实验 | 广州送样&小订单 | 上海工艺实验 | 小试 | OA辅助单（广州中试/上海中试为旧值，兼容保留）
   machineCount          Int                @map("machine_count")
   perMachineDailyOutput Int                @map("per_machine_daily_output")
   active                Boolean            @default(true)

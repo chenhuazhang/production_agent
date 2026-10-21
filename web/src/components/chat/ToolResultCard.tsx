@@ -15,6 +15,7 @@ interface ToolResult {
 
 const TOOL_LABELS: Record<string, string> = {
   query_order_progress: "查询订单进度",
+  query_orders_list: "订单列表查询",
   search_orders: "搜索订单",
   get_production_stages: "获取生产流程",
   analyze_capacity: "分析产能负荷",

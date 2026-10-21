@@ -1,0 +1,17 @@
+[Unit]
+Description=Production Agent MCP Server (SSE)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/production_agent/mcp-server
+ExecStart=/usr/bin/node /opt/production_agent/mcp-server/dist/index.js
+EnvironmentFile=/opt/production_agent/mcp-server/.env
+Restart=on-failure
+RestartSec=5
+User=www-data
+StandardOutput=append:/var/log/mcp-server.log
+StandardError=append:/var/log/mcp-server.log
+
+[Install]
+WantedBy=multi-user.target

@@ -7,6 +7,25 @@
       "apiKey": "BAILIAN_API_KEY",
       "models": [
         {
+          "id": "qwen3.8-max",
+          "name": "Qwen3.8-Max (阿里云百炼)",
+          "api": "openai-completions",
+          "reasoning": true,
+          "input": ["text"],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 128000,
+          "maxTokens": 32768,
+          "compat": {
+            "supportsDeveloperRole": false,
+            "thinkingFormat": "qwen"
+          }
+        },
+        {
           "id": "glm-5.2",
           "name": "GLM-5.2 (阿里云百炼)",
           "api": "openai-completions",
@@ -21,7 +40,27 @@
           "contextWindow": 128000,
           "maxTokens": 16384,
           "compat": {
-            "supportsDeveloperRole": false
+            "supportsDeveloperRole": false,
+            "thinkingFormat": "zai"
+          }
+        },
+        {
+          "id": "qwen3.7-max",
+          "name": "Qwen3.7-Max (阿里云百炼)",
+          "api": "openai-completions",
+          "reasoning": true,
+          "input": ["text"],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 128000,
+          "maxTokens": 32768,
+          "compat": {
+            "supportsDeveloperRole": false,
+            "thinkingFormat": "qwen"
           }
         }
       ]

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { MessageList, Message } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { sendChatMessageStream } from "@/lib/ai-client";
@@ -16,11 +16,13 @@ const SUGGESTIONS = [
 ];
 
 export function ChatPanel() {
-  const { sessionId, refresh: refreshSessionList } = useSession();
+  const { sessionId, refresh: refreshSessionList, adoptSession } = useSession();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState<string | null>(null);
+  // 本次请求服务端回传的真实会话 id（首条消息后绑定，避免 sess- 临时 id 分裂）
+  const headerSessionIdRef = useRef<string | null>(null);
 
   // 建议卡片点击 → 填入输入框
   const [fillValue, setFillValue] = useState<string | null>(null);
@@ -117,15 +119,25 @@ export function ChatPanel() {
         );
       };
 
+      headerSessionIdRef.current = null;
       try {
         await sendChatMessageStream(sessionId, { message: content }, {
           onTextDelta: appendDelta,
           onThinkingDelta: appendThinking,
           onToolStart: addTool,
           onToolEnd: finishTool,
+          onSessionId: (id) => {
+            headerSessionIdRef.current = id;
+          },
           onDone: () => {
             setMessages((prev) => prev.map((m) => (m.id === loadingId ? { ...m, isLoading: false } : m)));
             refreshSessionList();
+            // 首条消息后绑定真实会话 id（先标记历史已加载，避免切换 id 时重新拉取）
+            const sid = headerSessionIdRef.current;
+            if (sid && sid !== sessionId) {
+              setHistoryLoaded(sid);
+              adoptSession(sid);
+            }
           },
           onError: (msg) => setMessages((prev) => prev.map((m) => (m.id === loadingId ? { ...m, content: m.content || `错误：${msg}`, isLoading: false } : m))),
         });
@@ -136,7 +148,7 @@ export function ChatPanel() {
         setIsLoading(false);
       }
     },
-    [sessionId, refreshSessionList],
+    [sessionId, refreshSessionList, adoptSession],
   );
 
   // 是否显示建议卡片：只有欢迎消息时显示

@@ -30,6 +30,15 @@ COPY --from=deps /app/server/node_modules ./server/node_modules
 COPY pi_agent/ ./pi_agent/
 COPY server/ ./server/
 
+# AGENTS.md = Agent 系统提示（角色定位/意图路由/能力边界），运行期由框架从此目录向上加载
+# 若不复制，容器内 cwd=/app 找不到该文件，Agent 会丢失全部行为规范
+COPY AGENTS.md ./
+
+# 自定义模型注册表（bailian provider + qwen3.8-max/glm-5.2/qwen3.7-max）
+# 首次创建 agent-sessions 卷时 Docker 会把镜像内 /app/.pi 的内容复制进卷，
+# 因此新部署无需再手工 docker cp；卷已存在时仍需 docker cp 覆盖。
+COPY deploy/models.json ./.pi/agent/models.json
+
 # 环境
 ENV NODE_ENV=production
 ENV PORT=8000
