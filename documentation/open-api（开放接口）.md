@@ -101,6 +101,7 @@
 | 400 | `MISSING_PARAM` | 缺 `order_no` |
 | 400 | `INVALID_PARAM` | `order_no` 超长 / `base` 无法识别（message 附可用关键词清单） |
 | 401 | `UNAUTHORIZED` | 无 key 或 key 错误 |
+| 403 | `FORBIDDEN` | 该 API Key 无权查询所请求的业务范围 |
 | 404 | `ORDER_NOT_FOUND` | 所有业务范围查无此单 |
 | 500 | `DB_ERROR` | 所查业务范围全部 SQL 失败（附 `details`） |
 | 503 | `SERVICE_UNAVAILABLE` | `OPEN_API_KEY` 未配置（fail-closed，接口整体禁用） |

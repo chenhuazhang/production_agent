@@ -68,7 +68,7 @@ web (Next.js)  ──SSE/REST──▶  server (Hono)  ──createSession──
 
 ### 2.3 意图路由（AGENTS.md）
 
-系统提示 = `AGENTS.md` + 3 个 SKILL.md 正文 +（可选）业务范围说明 `scopeNote`。AGENTS.md 提供「问法 → 工具」映射表，SKILL.md 提供行为规范（何时调哪个工具、结果如何解读与排版）。三者由 `session.ts` 的 `buildSkillPromptBlocks()` 在服务端直接拼接进 `appendSystemPrompt`——**框架的 `<available_skills>` 需要 read 工具加载技能文件，但本 Agent 白名单无 read 工具，因此 SKILL.md 必须由服务端注入**（见 §11 决策）。
+系统提示 = `prompts/persona.md` + 3 个 SKILL.md 正文 +（可选）业务范围说明 `scopeNote`。persona.md 提供「问法 → 工具」映射表，SKILL.md 提供行为规范（何时调哪个工具、结果如何解读与排版）。三者由 `session.ts` 的 `buildSkillPromptBlocks()` 在服务端直接拼接进 `appendSystemPrompt`——**框架的 `<available_skills>` 需要 read 工具加载技能文件，但本 Agent 白名单无 read 工具，因此 SKILL.md 必须由服务端注入**（见 §11 决策）。
 
 ---
 
@@ -201,7 +201,7 @@ web (Next.js)  ──SSE/REST──▶  server (Hono)  ──createSession──
 
 企业微信机器人 A/B 各绑定一个 MaxKB 应用 → 应用模型名不同 → 服务端按 `body.model` 路由业务范围。
 
-`scopes.ts` 定义三个 `BusinessScope`：
+`scopes.ts` 定义三个 `AssistantScope`：
 
 | 模型名（/v1 收到的 model） | scope key | 允许业务类型 |
 |------|-----------|--------------|
@@ -387,7 +387,7 @@ SSE 事件协议：
 2. **排产时间回退（`timeFallbackCol`）**：列表 `since/until` 过滤时，排产为空回退到开单/其他活动时间，避免「加时间过滤就整批漏单」。
 3. **哨兵日期统一归一**：`1900/1899` 与空串一律归 `null`，「未设置」绝不作为真实完成时间交给外部系统（否则对接方据此误判「已完成/当前工序」）。
 4. **`current_stage` 由数据层算好**：源 ERP 时间列记录率仅 ~3.6%，「第一个未完成工序」推算法不可靠，故在数据层按业务规则补 `status/stages/current_stage`，对接方只展示不推断。
-5. **SKILL.md 直接注入系统提示**：框架技能机制需 read 工具加载，本 Agent 白名单无文件访问，故由 `buildSkillPromptBlocks` 服务端直读注入，等价「系统提示 = AGENTS.md + 3 SKILL.md」。
+5. **SKILL.md 直接注入系统提示**：框架技能机制需 read 工具加载，本 Agent 白名单无文件访问，故由 `buildSkillPromptBlocks` 服务端直读注入，等价「系统提示 = prompts/persona.md + 3 SKILL.md」。
 6. **工具层降级 mock、开放接口直连数据层**：工具层 SQL 失败降级 mock（保证对话有回退），但这与「外部系统要真实数据」冲突，故 `/open` 直连 `sqlServer.ts` 纯查询函数，绝不经工具层。
 7. **上海料次聚合 + 派生表 `ml.max_lot`**：「整单完成以最后料次为准」业务规则；统计在 `COUNT(DISTINCT CASE...)` 里内嵌 `SELECT MAX` 会触发 SQL Server error 130，故单独派生表提供 `max_lot`。
 8. **额度降级独立成执行器**：同端点同 Key、各模型独立额度，额度用尽按链切换；失败回合事件吞掉不转发，客户端看不到失败轮次。

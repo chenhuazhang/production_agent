@@ -9,7 +9,7 @@
 
 import { ALL_BASE_NAMES, type BaseName } from "./services/sqlServer.js";
 
-export interface BusinessScope {
+export interface AssistantScope {
   /** 范围标识（与模型名对应） */
   key: string;
   label: string;
@@ -30,7 +30,7 @@ const SCOPE_MAIN_NOTE =
   "业务范围限制：本助手处理 4 类业务：广州工艺实验 / 小试（全集团，研发实验）/ 上海工艺实验 / OA辅助单（注塑单、研发辅助单）。" +
   "**不处理「广州送样&小订单」**；如果用户询问该业务，请明确告知：本机器人不负责「广州送样&小订单」，请通过对应机器人咨询。";
 
-export const SCOPES: Record<string, BusinessScope> = {
+export const SCOPES: Record<string, AssistantScope> = {
   all: {
     key: "all",
     label: "全部业务",
@@ -59,7 +59,7 @@ export const SCOPES: Record<string, BusinessScope> = {
 /**
  * 模型名 → 业务范围。未知模型名回退到全部（兼容旧配置）。
  */
-export function resolveScopeByModel(modelName: string): BusinessScope {
+export function resolveScopeByModel(modelName: string): AssistantScope {
   const key = String(modelName || "").trim().toLowerCase();
   if (key === "production-agent-gz") return SCOPES["gz-sample"];
   if (key === "production-agent-main") return SCOPES.main;

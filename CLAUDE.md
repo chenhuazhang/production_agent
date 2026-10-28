@@ -51,11 +51,15 @@ production_agent/
 5. **权限矩阵** — 修改 `TOOL_PERMISSIONS` 前查看 `documentation/permissions.md`
 6. **环境变量** — `.env` 不入库、不入 Docker 镜像。所有 secrets 清单见 `documentation/variables.md`
 
+## 编码规范
+
+新代码遵循 `CODING_STANDARDS.md`。业务规则见 `Doc/production-agent/cn/01-需求规格.md`，单次改动的验收标准写入 `docs/specs/`。
+
 ## 当前已知问题（修改代码时注意）
 
 - **鉴权未接入**：`ANON_USER.role = "supervisor"` 是临时方案，`body.user` 可被伪造。生产上线前必须替换
 - **上海中试 JOIN 慢**：`sqlServer.ts` 的上海 SQL 模板 5 表 JOIN，实际 web 端只用基础查询
-- **同步 I/O**：`executionTracer.ts:148` 和 `sessions.ts:139` 用了 `fs.*Sync`
+- ~~**同步 I/O**~~：已修复（2026-10-22）——`executionTracer` 与 `SessionRepository` 均改为 `fs/promises`
 - **`recommend_base` 只用 mock 数据**：与 `analyze_capacity`（有 SQL 路径）不一致
 
 ## 常用命令

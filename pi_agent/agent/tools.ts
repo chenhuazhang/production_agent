@@ -22,9 +22,6 @@ import {
   type BaseCapacity,
 } from "../data/capacity.js";
 import {
-  queryOrderProgress,
-  queryOrderProgressMany,
-  queryPendingOrder,
   queryOrdersList,
   resolveBusinessTypes,
   getRealTimePendingCounts,
@@ -32,8 +29,13 @@ import {
   DEFAULT_LIST_LIMIT,
   type BaseName,
 } from "./services/sqlServer.js";
-import { checkPermission } from "./services/permissionGuard.js";
-import { getCurrentUser } from "./services/userContext.js";
+import { allowedTypes, checkPermission, narrowTypes } from "./services/access.js";
+import {
+  NOT_FOUND_HINT,
+  lookupOrder,
+  singleScopeHint,
+  validateDateRange,
+} from "./services/orderQuery.js";
 
 // ============================================
 // 工具：查询订单进度
@@ -74,52 +76,52 @@ export const queryOrderProgressTool = defineTool({
     if (!perm.allowed) return textResult({ error: perm.reason });
 
     const { order_no, base } = params as { order_no: string; base?: BaseName };
-    // 业务范围钳制（MaxKB 多智能体按模型名分流）
-    const allowed = getCurrentUser()?.allowedBusinessTypes;
-    try {
-      if (base) {
-        if (allowed && !allowed.includes(base)) {
-          return textResult({
-            error: `本助手不支持业务范围「${base}」`,
-            hint: `可查询的业务范围: ${allowed.join(" / ")}`,
-          });
-        }
-        const r = await queryOrderProgress(order_no, base);
-        if (!r.found) {
-          // 主表未命中的兜底：查登记表（未排产订单）——排产前只登记在 7367/7293，主表查不到
-          const pending = await queryPendingOrder(order_no);
-          if (pending.found) return textResult(pending);
-          return textResult({
-            error: `业务范围 ${base} 未找到订单 ${order_no}`,
-            hint:
-              `订单号是否正确？也可能是 PLM 和 OA 的流程审批尚未走完——订单需通过 PLM 和 OA 审批后才会流转进 MYEXCEL 进行排产，未排产且尚未登记的订单查询不到，请确认审批流程是否已走完。` +
-              `也可尝试其他业务范围: ${ALL_BASE_NAMES.filter((b) => b !== base).join(", ")}。另外系统仅查询最近 3 个月内有工序活动的订单，更早的订单查不到。`,
-          });
-        }
-        return textResult(r);
-      }
-      // 未指定 base → 并行查全部业务类型（按范围钳制）
-      const basesToQuery = allowed ?? ALL_BASE_NAMES;
-      const results = await queryOrderProgressMany(order_no, basesToQuery);
-      const found = results.filter((r) => r.found && !("error" in r));
-      if (found.length === 0) {
-        // 主表均未命中的兜底：查登记表（未排产订单）——排产前只登记在 7367/7293，主表查不到
-        const pending = await queryPendingOrder(order_no);
-        if (pending.found) return textResult(pending);
-        const errors = results
-          .filter((r) => "error" in r)
-          .map((r) => `${(r as { base: BaseName }).base}: ${(r as { error?: string }).error}`);
-        return textResult({
-          error: `${basesToQuery.length} 个业务范围均未找到订单 ${order_no}`,
-          hint:
-            "未找到的可能原因：① 订单号不正确；② PLM 和 OA 的流程审批尚未走完——订单需通过 PLM 和 OA 审批后才会流转进 MYEXCEL 进行排产，未排产且尚未登记的订单查询不到，请确认审批流程是否已走完；③ 订单过旧，系统仅查询最近 3 个月内有工序活动的订单。",
-          hints: errors.length ? { db_errors: errors } : undefined,
-        });
-      }
+    const allowed = allowedTypes();
+
+    if (base && !allowed.includes(base)) {
       return textResult({
-        matches: found,
-        note: found.length > 1 ? "同一订单号在多个业务范围命中，请确认" : undefined,
+        error: `本助手不支持业务范围「${base}」`,
+        hint: `可查询的业务范围: ${allowed.join(" / ")}`,
       });
+    }
+
+    const basesToQuery = base ? [base] : allowed;
+
+    try {
+      const result = await lookupOrder(order_no, basesToQuery);
+      switch (result.kind) {
+        case "found":
+          if (base) return textResult(result.matches[0]);
+          return textResult({
+            matches: result.matches,
+            note: result.matches.length > 1 ? "同一订单号在多个业务范围命中，请确认" : undefined,
+          });
+        case "pending":
+          return textResult(result.pending);
+        case "unavailable":
+          // 全部业务范围都查失败：不能报「未找到」
+          return textResult({
+            error: "SQL Server 查询失败，本次结果不可用",
+            detail: result.errors.map((e) => `${e.base}: ${e.error}`).join("; "),
+            hint: "查询没有成功完成，不能据此判断订单不存在，请稍后重试或联系计划岗。",
+          });
+        case "not_found":
+          if (base) {
+            return textResult({
+              error: `业务范围 ${base} 未找到订单 ${order_no}`,
+              hint: singleScopeHint(base, ALL_BASE_NAMES),
+            });
+          }
+          return textResult({
+            error: `${basesToQuery.length} 个业务范围均未找到订单 ${order_no}`,
+            hint: NOT_FOUND_HINT,
+            hints: result.errors.length
+              ? { db_errors: result.errors.map((e) => `${e.base}: ${e.error}`) }
+              : undefined,
+          });
+      }
+      const exhaustive: never = result;
+      return exhaustive;
     } catch (err) {
       // SQL Server 连接/查询失败 → 返回明确错误让 agent 告知用户
       return textResult({
@@ -196,17 +198,9 @@ export const queryOrdersListTool = defineTool({
       until?: string;
     };
 
-    // 日期格式校验（YYYY-MM-DD）
-    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
-    if (since && !dateRe.test(since)) {
-      return textResult({ error: `since 格式无效（应为 YYYY-MM-DD）: ${since}` });
-    }
-    if (until && !dateRe.test(until)) {
-      return textResult({ error: `until 格式无效（应为 YYYY-MM-DD）: ${until}` });
-    }
-    if (since && until && since > until) {
-      return textResult({ error: `since (${since}) 不能晚于 until (${until})` });
-    }
+    // 日期格式校验（与开放接口共用同一口径）
+    const dateError = validateDateRange(since, until);
+    if (dateError) return textResult({ error: dateError });
 
     // 别名展开 + 归一（未知别名返回错误 + 可用清单）
     let types: BaseName[];
@@ -216,18 +210,16 @@ export const queryOrdersListTool = defineTool({
       return textResult({ error: err instanceof Error ? err.message : String(err) });
     }
 
-    // 业务范围钳制（MaxKB 多智能体按模型名分流）：只保留本助手允许的类型
-    const allowed = getCurrentUser()?.allowedBusinessTypes;
-    if (allowed) {
-      const scoped = types.filter((t) => allowed.includes(t));
-      if (scoped.length === 0) {
-        return textResult({
-          error: `本助手仅支持以下业务范围: ${allowed.join(" / ")}`,
-          hint: "所请求的业务类型不在本助手范围内，请使用对应的机器人咨询。",
-        });
-      }
-      types = scoped;
+    // 业务范围钳制（MaxKB 多智能体按模型名分流）：统一由 access 模块判定
+    const allowed = allowedTypes();
+    const scoped = narrowTypes(types);
+    if (scoped.length === 0) {
+      return textResult({
+        error: `本助手仅支持以下业务范围: ${allowed.join(" / ")}`,
+        hint: "所请求的业务类型不在本助手范围内，请使用对应的机器人咨询。",
+      });
     }
+    types = scoped;
 
     // 无任何过滤条件 → 默认近 90 天排产窗口（避免全表扫描）
     let effSince = since;

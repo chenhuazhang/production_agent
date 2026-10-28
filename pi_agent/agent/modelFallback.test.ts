@@ -135,7 +135,8 @@ describe("runPromptWithModelFallback（降级执行）", () => {
       { id: "qwen3.8-max" },
       { id: "glm-5.2" },
     ]);
-    expect(result.status).toBe("error");
+    // `expect(...).toBe()` 不收窄联合类型，显式断言后才能读 message
+    if (result.status !== "error") throw new Error(`expected error, got ${result.status}`);
     expect(result.message).toContain("Context length");
     expect(session.setModelCalls).toEqual([]);
     expect(session.promptCalls).toEqual(["qwen3.8-max"]);
@@ -148,7 +149,7 @@ describe("runPromptWithModelFallback（降级执行）", () => {
       { id: "qwen3.8-max" },
       { id: "glm-5.2" },
     ]);
-    expect(result.status).toBe("error");
+    if (result.status !== "error") throw new Error(`expected error, got ${result.status}`);
     expect(result.message).toContain("全部用尽");
     expect(session.setModelCalls).toEqual(["glm-5.2"]);
     expect(session.promptCalls).toEqual(["qwen3.8-max", "glm-5.2"]);
@@ -157,7 +158,7 @@ describe("runPromptWithModelFallback（降级执行）", () => {
   it("空降级链 → 返回配置错误", async () => {
     const session = new MockSession("qwen3.8-max");
     const { result } = await run(session, []);
-    expect(result.status).toBe("error");
+    if (result.status !== "error") throw new Error(`expected error, got ${result.status}`);
     expect(result.message).toContain("降级链为空");
   });
 });

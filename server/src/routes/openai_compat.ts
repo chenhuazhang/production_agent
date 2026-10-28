@@ -18,8 +18,8 @@ import type { SessionStore } from "../services/sessionStore";
 
 type AnyModel = Model<any>;
 import { createLogger } from "../services/logger";
-import { runPromptWithModelFallback, resolveScopeByModel, type UserContext } from "pi-agent";
-import { REPLY_FOOTER, withReplyFooter, stripReplyFooter } from "../services/replyFooter";
+import { runTurn, resolveScopeByModel, type UserContext } from "pi-agent";
+import { REPLY_FOOTER, stripReplyFooter } from "../services/replyFooter";
 import { randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
@@ -101,58 +101,50 @@ function buildPromptFromMessages(messages: ChatMessage[]): string {
 
 /**
  * 同步执行 pi_agent prompt，聚合事件为最终文本。
- * - 通过 runPromptWithModelFallback 执行（主模型额度用尽自动降级）
+ * - 通过 runTurn 执行（含模型额度降级与页脚）
  * - 累积 text_delta 到 buffer / 记录 toolEvents
  * - 成功 resolve；任一模型最终失败（含降级链全部用尽）reject
  */
-function runPromptSync(
+async function runPromptSync(
   session: AgentSession,
   prompt: string,
   user: UserContext,
   modelChain: AnyModel[],
 ): Promise<{ content: string; toolEvents: Array<Record<string, unknown>> }> {
-  return new Promise((resolve, reject) => {
-    let buffer = "";
-    const toolEvents: Array<Record<string, unknown>> = [];
+  let content = "";
+  const toolEvents: Array<Record<string, unknown>> = [];
 
-    runPromptWithModelFallback({
-      session,
-      text: prompt,
-      user,
-      modelChain,
-      onEvent: (raw) => {
-        switch (raw.type) {
-          case "message_update": {
-            if (raw.assistantMessageEvent.type === "text_delta") {
-              buffer += raw.assistantMessageEvent.delta;
-            }
-            break;
-          }
-          case "tool_execution_start":
-            toolEvents.push({ phase: "start", tool: raw.toolName, args: raw.args });
-            break;
-          case "tool_execution_end":
-            toolEvents.push({
-              phase: "end",
-              tool: raw.toolName,
-              isError: raw.isError,
-              result: raw.result,
-            });
-            break;
-          default:
-            break;
-        }
-      },
-    })
-      .then((result) => {
-        if (result.status === "error") {
-          reject(new Error(result.message));
-        } else {
-          resolve({ content: buffer, toolEvents });
-        }
-      })
-      .catch((err) => reject(err));
+  // 同步接口同样走 runTurn：页脚与降级只有一份实现
+  const result = await runTurn({
+    session,
+    text: prompt,
+    user,
+    modelChain,
+    footer: REPLY_FOOTER,
+    onEvent: (ev) => {
+      switch (ev.type) {
+        case "text":
+          content += ev.delta;
+          break;
+        case "tool_start":
+          toolEvents.push({ phase: "start", tool: ev.toolName, args: ev.args });
+          break;
+        case "tool_end":
+          toolEvents.push({
+            phase: "end",
+            tool: ev.toolName,
+            isError: ev.isError,
+            result: ev.result,
+          });
+          break;
+        default:
+          break;
+      }
+    },
   });
+
+  if (result.status === "error") throw new Error(result.message);
+  return { content, toolEvents };
 }
 
 /**
@@ -178,8 +170,7 @@ function runPromptStream(
   const completionId = `chatcmpl-${randomUUID()}`;
   const created = Math.floor(Date.now() / 1000);
 
-  const send = (data: unknown) =>
-    encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
+  const send = (data: unknown) => encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
   const sendDone = () => encoder.encode("data: [DONE]\n\n");
 
   let firstDelta = true;
@@ -193,10 +184,7 @@ function runPromptStream(
         try { onDone?.(); } catch { /* noop */ }
         try { controller.close(); } catch { /* noop */ }
       };
-      const emitChunk = (
-        delta: Record<string, unknown>,
-        finish_reason: null | "stop",
-      ) =>
+      const emitChunk = (delta: Record<string, unknown>, finish_reason: null | "stop") =>
         controller.enqueue(
           send({
             id: completionId,
@@ -213,35 +201,28 @@ function runPromptStream(
         safeClose();
       };
 
-      // 带模型降级执行：主模型额度用尽自动切下一个模型（同端点同 Key）。
-      // 失败回合的 message_end(error) / agent_end 被降级执行器过滤，
-      // 不会提前关闭流；成功回合的 agent_end 触发 finish + 关闭。
-      runPromptWithModelFallback({
+      // runTurn 负责页脚与降级；这里只把 TurnEvent 编码成 OpenAI chunk
+      runTurn({
         session,
         text: prompt,
         user,
         modelChain,
-        onEvent: (raw) => {
+        footer: REPLY_FOOTER,
+        onEvent: (ev) => {
           if (closed) return;
-          switch (raw.type) {
-            case "message_update": {
-              if (raw.assistantMessageEvent.type === "text_delta") {
-                const delta: Record<string, unknown> = firstDelta
-                  ? { role: "assistant", content: raw.assistantMessageEvent.delta }
-                  : { content: raw.assistantMessageEvent.delta };
-                firstDelta = false;
-                emitChunk(delta, null);
-              }
+          switch (ev.type) {
+            case "text": {
+              const delta: Record<string, unknown> = firstDelta
+                ? { role: "assistant", content: ev.delta }
+                : { content: ev.delta };
+              firstDelta = false;
+              emitChunk(delta, null);
               break;
             }
-            case "agent_end":
-              if (!closed) {
-                // 回复流已结束：先补一条反馈页脚 content chunk，再发 finish stop。
-                emitChunk({ content: `\n\n${REPLY_FOOTER}` }, null);
-                emitChunk({}, "stop");
-                controller.enqueue(sendDone());
-                safeClose();
-              }
+            case "done":
+              emitChunk({}, "stop");
+              controller.enqueue(sendDone());
+              safeClose();
               break;
             default:
               break;
@@ -251,9 +232,7 @@ function runPromptStream(
         .then((result) => {
           if (result.status === "error") emitError(result.message);
         })
-        .catch((err) =>
-          emitError(err instanceof Error ? err.message : String(err)),
-        );
+        .catch((err) => emitError(err instanceof Error ? err.message : String(err)));
     },
     cancel() {
       if (closed) return;
@@ -395,7 +374,7 @@ export function openaiCompatRoute(store: SessionStore) {
             index: 0,
             message: {
               role: "assistant",
-              content: withReplyFooter(content) || "(无回复)",
+              content: content || "(无回复)",
             },
             finish_reason: "stop",
           },

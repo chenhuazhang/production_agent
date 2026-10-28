@@ -62,6 +62,25 @@ function buildSkillPromptBlocks(): string[] {
 }
 
 /**
+ * 运行期人格：从 prompts/persona.md 读取。
+ *
+ * 不再依赖框架自动加载 AGENTS.md —— 那会把仓库的工程说明（命令、目录、已知问题）
+ * 一起塞进模型上下文，模型会误以为自己是写代码的 agent。
+ */
+function buildPersonaBlock(): string[] {
+  try {
+    const raw = readFileSync(join(AGENT_DIR, "prompts", "persona.md"), "utf-8");
+    return [raw.replace(/^---[\s\S]*?---\s*/, "").trim()];
+  } catch (err) {
+    console.warn(
+      "[session] persona 加载失败:",
+      err instanceof Error ? err.message : err,
+    );
+    return [];
+  }
+}
+
+/**
  * 解析单个模型 id → Model 实例。
  * 优先从 registry（models.json）查找；找不到则用 pi-ai 内置 getModel 兜底。
  */
@@ -102,10 +121,11 @@ export function resolveModelChain(
  *
  * @example
  * ```ts
- * const { session } = await createSession();
- * const unsubscribe = subscribeToEvents(session, printEvent);
- * await session.prompt("查询 ZS-2026-001 进度");
- * unsubscribe();
+ * const { session, modelChain } = await createSession();
+ * await runTurn({
+ *   session, text: "查询 ZS-2026-001 进度", user, modelChain,
+ *   onEvent: (ev) => console.log(ev.type),
+ * });
  * ```
  */
 export async function createSession(config: AgentConfig = {}) {
@@ -129,6 +149,8 @@ export async function createSession(config: AgentConfig = {}) {
   const loader = new DefaultResourceLoader({
     cwd,
     agentDir: getAgentDir(),
+    // 运行期不看仓库的 AGENTS.md / CLAUDE.md：人格与技能由下面显式注入
+    noContextFiles: true,
     skillsOverride: (current) => ({
       skills: [
         ...current.skills,
@@ -140,6 +162,7 @@ export async function createSession(config: AgentConfig = {}) {
     // SKILL.md 正文直接注入系统提示（白名单无 read 工具，模型无法自行加载技能文件）
     // + 业务范围说明（MaxKB 多智能体按模型名分流时由服务端传入）
     appendSystemPrompt: [
+      ...buildPersonaBlock(),
       ...buildSkillPromptBlocks(),
       ...(finalConfig.scopeNote ? [finalConfig.scopeNote] : []),
     ],

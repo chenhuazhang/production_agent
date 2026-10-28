@@ -11,7 +11,7 @@ import { streamSSE } from "hono/streaming";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { SessionStore } from "../services/sessionStore";
 import { createLogger } from "../services/logger";
-import { runPromptWithModelFallback, type UserContext } from "pi-agent";
+import { runTurn, type TurnEvent, type UserContext } from "pi-agent";
 import { ExecutionTracer } from "../services/executionTracer";
 import { REPLY_FOOTER } from "../services/replyFooter";
 
@@ -30,37 +30,24 @@ const ANON_USER: UserContext = {
   role: "supervisor",
   baseId: null,
 };
-
-type RawEvent = Parameters<Parameters<AgentSession["subscribe"]>[0]>[0];
-
-function transformAgentEvent(raw: RawEvent): { event: string; data: object } | null {
-  switch (raw.type) {
-    case "message_update": {
-      if (raw.assistantMessageEvent.type === "text_delta") {
-        return { event: "text_delta", data: { delta: raw.assistantMessageEvent.delta } };
-      }
-      if (raw.assistantMessageEvent.type === "thinking_delta") {
-        return { event: "thinking_delta", data: { delta: raw.assistantMessageEvent.delta } };
-      }
-      return null;
-    }
-    case "tool_execution_start":
-      return { event: "tool_start", data: { toolName: raw.toolName, args: raw.args } };
-    case "tool_execution_end":
+/** TurnEvent → 本项目 SSE 事件（协议见 README） */
+function toSse(ev: TurnEvent): { event: string; data: object } | null {
+  switch (ev.type) {
+    case "text":
+      return { event: "text_delta", data: { delta: ev.delta } };
+    case "thinking":
+      return { event: "thinking_delta", data: { delta: ev.delta } };
+    case "tool_start":
+      return { event: "tool_start", data: { toolName: ev.toolName, args: ev.args } };
+    case "tool_end":
       return {
         event: "tool_end",
-        data: { toolName: raw.toolName, isError: raw.isError, result: raw.result },
+        data: { toolName: ev.toolName, isError: ev.isError, result: ev.result },
       };
-    case "agent_end":
+    case "done":
       return { event: "done", data: {} };
-    case "message_end": {
-      const msg = raw.message;
-      if ("stopReason" in msg && msg.stopReason === "error") {
-        return { event: "error", data: { message: msg.errorMessage ?? "Unknown error" } };
-      }
-      return null;
-    }
-    default:
+    case "error":
+      // 错误统一由 result.status 发送，避免与降级执行器的过滤逻辑打架
       return null;
   }
 }
@@ -113,49 +100,35 @@ export function chatRoute(store: SessionStore) {
 
     return streamSSE(c, async (stream) => {
       const traceId = tracer.start(sessionId, text, user);
-      // 幂等保护：单次请求只补一次页脚（框架重试可能导致 agent_end 触发多次）
-      let footerSent = false;
       try {
         logger.info("Executing prompt", { sessionId, textLength: text.length });
-        // 带模型降级执行：主模型额度用尽自动切下一个模型（同端点同 Key），
-        // 失败回合的 error / agent_end 事件会被过滤，不推送前端。
-        const result = await runPromptWithModelFallback({
+        // 一回合的唯一实现：模型降级、页脚、事件翻译都在 runTurn 内完成
+        const result = await runTurn({
           session: entry.session,
           text,
           user,
           modelChain: entry.modelChain,
-          onEvent: (raw) => {
-            // 喂给 tracer（结构化日志持久化）
-            tracer.record(raw, traceId);
-
-            // 喂给 SSE（实时推送前端）
-            const sse = transformAgentEvent(raw);
+          footer: REPLY_FOOTER,
+          onEvent: (ev) => {
+            tracer.record(ev, traceId);
+            const sse = toSse(ev);
             if (!sse) return;
-
-            // agent_end 到达 = 本轮回复成功结束（降级失败回合的 agent_end 已被执行器过滤）。
-            // 在推 done 之前补一条反馈页脚 text_delta，保证每条成功回复末尾都带反馈表链接。
-            // 注意：页脚只发前端显示，不写回 session（会话历史里不含这句话）。
-            if (raw.type === "agent_end" && !footerSent) {
-              footerSent = true;
-              stream.writeSSE({ event: "text_delta", data: JSON.stringify({ delta: `\n\n${REPLY_FOOTER}` }) });
-            }
-
             stream.writeSSE({ event: sse.event, data: JSON.stringify(sse.data) });
             logger.sseEvent(sessionId, sse.event);
           },
         });
 
         if (result.status === "error") {
-          tracer.error(traceId, result.message);
+          await tracer.error(traceId, result.message);
           logger.error("Prompt execution failed", { sessionId, error: result.message });
           await stream.writeSSE({ event: "error", data: JSON.stringify({ message: result.message }) });
         } else {
-          tracer.finish(traceId);
+          await tracer.finish(traceId);
           logger.response(sessionId, Date.now() - startTime);
         }
       } catch (error) {
         const msg = error instanceof Error ? error.message : "Unknown error";
-        tracer.error(traceId, msg);
+        await tracer.error(traceId, msg);
         logger.error("Prompt execution failed", { sessionId, error: msg });
         await stream.writeSSE({ event: "error", data: JSON.stringify({ message: msg }) });
       } finally {

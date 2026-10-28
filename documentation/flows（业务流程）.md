@@ -16,7 +16,7 @@
   - 跨越信任边界: 不可信用户输入 → 服务端
 
 步骤 2: AgentSession.prompt(text)
-  - LLM 收到: system prompt (AGENTS.md + 3 SKILL.md) + 用户文本
+  - LLM 收到: system prompt (prompts/persona.md + 3 SKILL.md) + 用户文本
   - LLM 决策: 路由到 query_order_progress 工具
   - 信任边界: LLM 输出（不可信）→ 工具选择决策
 

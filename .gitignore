@@ -58,3 +58,15 @@ production-agent.cmd
 
 # Docs (optional)
 docs/superpowers/
+
+# --- secrets & runtime (added for GitHub backup) ---
+.env
+.env.*
+!.env.example
+deploy/.env
+deploy/.env.production
+mcp-server/.env
+web/.env
+pi_agent/.env
+*.log
+test_append.mjs

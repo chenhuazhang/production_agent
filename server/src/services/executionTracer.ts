@@ -6,13 +6,15 @@
  * - 每次工具调用的输入/输出/耗时
  * - 总耗时 + 错误信息
  *
+ * 只依赖 TurnEvent（与传输无关），不直接订阅框架事件——
+ * 换传输方式（SSE / OpenAI 兼容 / 同步）不影响日志。
+ *
  * 持久化到 JSONL 文件：data/logs/traces/{YYYY-MM-DD}.jsonl
  */
 
-import * as fs from "node:fs";
+import { mkdir, appendFile } from "node:fs/promises";
 import * as path from "node:path";
-import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import type { UserContext } from "pi-agent";
+import type { TurnEvent, UserContext } from "pi-agent";
 
 // ============================================
 // 类型
@@ -41,8 +43,6 @@ export interface ExecutionTrace {
   error?: string;
 }
 
-type RawEvent = Parameters<Parameters<AgentSession["subscribe"]>[0]>[0];
-
 // ============================================
 // Tracer
 // ============================================
@@ -65,87 +65,70 @@ export class ExecutionTracer {
     return traceId;
   }
 
-  /** 订阅底层事件，记录工具调用和文本 */
-  record(raw: RawEvent, traceId: string): void {
+  /** 记录一个回合事件 */
+  record(event: TurnEvent, traceId: string): void {
     const t = this.active.get(traceId);
     if (!t) return;
 
-    switch (raw.type) {
-      case "message_update": {
-        if (raw.assistantMessageEvent.type === "text_delta") {
-          t.outputText += raw.assistantMessageEvent.delta;
-        }
+    switch (event.type) {
+      case "text":
+        t.outputText += event.delta;
         break;
-      }
-      case "tool_execution_start": {
+      case "tool_start":
         t.toolSteps.push({
-          toolName: raw.toolName,
-          args: (raw.args ?? {}) as Record<string, unknown>,
+          toolName: event.toolName,
+          args: event.args,
           isError: false,
           startedAt: new Date().toISOString(),
         });
         break;
-      }
-      case "tool_execution_end": {
-        const step = [...t.toolSteps].reverse().find((s: ToolStep) => s.toolName === raw.toolName && !s.endedAt);
+      case "tool_end": {
+        const step = [...t.toolSteps]
+          .reverse()
+          .find((s) => s.toolName === event.toolName && !s.endedAt);
         if (step) {
-          step.result = raw.result;
-          step.isError = raw.isError;
+          step.result = event.result;
+          step.isError = event.isError;
           step.endedAt = new Date().toISOString();
           step.durationMs =
             new Date(step.endedAt).getTime() - new Date(step.startedAt).getTime();
         }
         break;
       }
-      case "agent_end": {
-        // 工具步骤可能还在 agent_end 之后提交——不强制此处写文件
+      default:
         break;
-      }
-      case "turn_end": {
-        // turn_end 可能早于 agent_end，不在此处 persist
-        // 最终由 finish() 统一落盘
-        break;
-      }
     }
   }
 
   /** 标记完成并持久化 */
-  finish(traceId: string): void {
+  async finish(traceId: string): Promise<void> {
     const t = this.active.get(traceId);
-    if (t) {
-      t.endedAt = new Date().toISOString();
-      t.durationMs = new Date(t.endedAt).getTime() - new Date(t.startedAt).getTime();
-      this.persist(traceId);
-    }
+    if (!t) return;
+    t.endedAt = new Date().toISOString();
+    t.durationMs = new Date(t.endedAt).getTime() - new Date(t.startedAt).getTime();
+    await this.persist(traceId);
   }
 
   /** 标记错误 */
-  error(traceId: string, message: string): void {
+  async error(traceId: string, message: string): Promise<void> {
     const t = this.active.get(traceId);
-    if (t) {
-      t.error = message;
-      t.endedAt = new Date().toISOString();
-      t.durationMs = new Date(t.endedAt).getTime() - new Date(t.startedAt).getTime();
-      this.persist(traceId);
-    }
+    if (!t) return;
+    t.error = message;
+    t.endedAt = new Date().toISOString();
+    t.durationMs = new Date(t.endedAt).getTime() - new Date(t.startedAt).getTime();
+    await this.persist(traceId);
   }
 
-  // ==========================================
-  // 持久化
-  // ==========================================
-
-  private persist(traceId: string): void {
+  private async persist(traceId: string): Promise<void> {
     const t = this.active.get(traceId);
     if (!t) return;
     this.active.delete(traceId);
 
     try {
-      const today = new Date().toISOString().slice(0, 10); // "2026-06-26"
+      const today = new Date().toISOString().slice(0, 10);
       const logsDir = path.resolve(process.cwd(), "data", "logs", "traces");
-      fs.mkdirSync(logsDir, { recursive: true });
-
-      const file = path.join(logsDir, `${today}.jsonl`);
-      fs.appendFileSync(file, JSON.stringify(t) + "\n", "utf-8");
+      await mkdir(logsDir, { recursive: true });
+      await appendFile(path.join(logsDir, `${today}.jsonl`), JSON.stringify(t) + "\n", "utf-8");
     } catch (err) {
       console.error("[ExecutionTracer] persist failed:", err);
     }

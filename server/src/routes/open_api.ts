@@ -10,13 +10,16 @@
 
 import { Hono } from "hono";
 import {
-  queryOrderProgressMany,
   queryOrdersList,
   resolveBusinessTypes,
+  lookupOrder,
+  validateDateRange,
+  type OrderLookup,
+  narrowTypes,
+  OPEN_API_PRINCIPAL,
   ALL_BASE_NAMES,
   DEFAULT_LIST_LIMIT,
   type BaseName,
-  type OrderProgressResult,
 } from "pi-agent";
 import { createLogger } from "../services/logger";
 import { appendFileSync, mkdirSync } from "node:fs";
@@ -30,8 +33,6 @@ const MAX_ORDER_NO_LEN = 64;
 /** 列表查询每业务类型返回上限（数据窗口为近 3 个月，超量时用 since/until 收窄时间分段拉取） */
 const MAX_LIST_LIMIT = 1000;
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
 /** 查询审计落盘日志：外部接口的调用记录需可追溯（谁在何时查了哪个订单、结果如何） */
 const REQ_LOG = path.resolve(process.cwd(), "data", "logs", "open-api-requests.jsonl");
 
@@ -44,8 +45,6 @@ export function logOpenApiEvent(entry: Record<string, unknown>): void {
     // 日志失败不影响请求
   }
 }
-
-type ResultWithError = OrderProgressResult & { error: string };
 
 export function openApiRoute(): Hono {
   const app = new Hono();
@@ -91,10 +90,19 @@ export function openApiRoute(): Hono {
       );
     }
 
-    // ── 3. 直连数据层并行查询（无 mock 降级）──
-    let results: Array<OrderProgressResult | ResultWithError>;
+    // ── 2.5 授权收窄（开放接口是独立信任域，见 OPEN_API_PRINCIPAL）──
+    bases = narrowTypes(bases, OPEN_API_PRINCIPAL);
+    if (bases.length === 0) {
+      return c.json(
+        { ok: false, error: { code: "FORBIDDEN", message: "该 API Key 无权查询所请求的业务范围" } },
+        403,
+      );
+    }
+
+    // ── 3. 查询（主表命中；开放接口不查登记表，保持原有契约）──
+    let lookup: OrderLookup;
     try {
-      results = await queryOrderProgressMany(orderNo, bases);
+      lookup = await lookupOrder(orderNo, bases, { includePending: false });
     } catch (err) {
       // getPool 级别的致命错误（如 SQL 配置缺失）
       const msg = err instanceof Error ? err.message : String(err);
@@ -112,56 +120,49 @@ export function openApiRoute(): Hono {
       );
     }
 
-    // ── 4. 分拣结果：命中 / SQL 失败 / 未找到 ──
-    const matches = results.filter((r) => r.found && !("error" in r));
-    const dbErrors = results
-      .filter((r): r is ResultWithError => "error" in r)
-      .map((r) => ({ base: r.base, error: r.error }));
-    const status = matches.length > 0 ? 200 : dbErrors.length === results.length ? 500 : 404;
     const duration = Date.now() - started;
 
-    logOpenApiEvent({
-      event: "query",
-      order_no: orderNo,
-      bases,
-      status,
-      match_count: matches.length,
-      duration_ms: duration,
-    });
-
-    // 所查业务类型全部 SQL 失败 → 500（不能谎报"未找到"）
-    if (matches.length === 0 && dbErrors.length === results.length) {
-      logger.error("Open API all bases failed", { orderNo, dbErrors });
+    // 所有业务范围都查失败 → 500（不能谎报「未找到」）
+    if (lookup.kind === "unavailable") {
+      logOpenApiEvent({ event: "query", order_no: orderNo, bases, status: 500, duration_ms: duration });
+      logger.error("Open API all bases failed", { orderNo, errors: lookup.errors });
       return c.json(
-        {
-          ok: false,
-          error: { code: "DB_ERROR", message: "SQL Server 查询失败", details: dbErrors },
-        },
+        { ok: false, error: { code: "DB_ERROR", message: "SQL Server 查询失败", details: lookup.errors } },
         500,
       );
     }
 
     // 命中 ≥1 个业务类型 → 200（部分类型 SQL 失败时附 warnings）
-    if (matches.length > 0) {
-      logger.info("Open API order found", {
-        orderNo,
-        matchCount: matches.length,
-        durationMs: duration,
+    if (lookup.kind === "found") {
+      const { matches, errors: dbErrors } = lookup;
+      logOpenApiEvent({
+        event: "query",
+        order_no: orderNo,
+        bases,
+        status: 200,
+        match_count: matches.length,
+        duration_ms: duration,
       });
+      logger.info("Open API order found", { orderNo, matchCount: matches.length, durationMs: duration });
       return c.json({
         ok: true,
         order_no: orderNo,
         bases_queried: bases,
         matches,
         match_count: matches.length,
-        ...(matches.length > 1
-          ? { note: "同一订单号在多个业务范围命中，请确认" }
-          : {}),
+        ...(matches.length > 1 ? { note: "同一订单号在多个业务范围命中，请确认" } : {}),
         ...(dbErrors.length > 0 ? { warnings: dbErrors } : {}),
       });
     }
 
-    // 全部查无此单 → 404（部分类型 SQL 失败时附 db_errors，诚实表达"没找到可能是没查成"）
+    // 尚未排产（仅当 includePending 打开时会出现）
+    if (lookup.kind === "pending") {
+      logOpenApiEvent({ event: "query", order_no: orderNo, bases, status: 200, duration_ms: duration });
+      return c.json({ ok: true, order_no: orderNo, status: "待排产", pending: lookup.pending }, 200);
+    }
+
+    // 全部查无此单 → 404（部分类型 SQL 失败时附 db_errors，诚实表达「没找到可能是没查成」）
+    logOpenApiEvent({ event: "query", order_no: orderNo, bases, status: 404, duration_ms: duration });
     logger.info("Open API order not found", { orderNo, bases, durationMs: duration });
     return c.json(
       {
@@ -173,7 +174,7 @@ export function openApiRoute(): Hono {
         },
         order_no: orderNo,
         bases_queried: bases,
-        ...(dbErrors.length > 0 ? { db_errors: dbErrors } : {}),
+        ...(lookup.errors.length > 0 ? { db_errors: lookup.errors } : {}),
       },
       404,
     );
@@ -206,6 +207,15 @@ export function openApiRoute(): Hono {
       );
     }
 
+    // ── 1.5 授权收窄（开放接口是独立信任域，见 OPEN_API_PRINCIPAL）──
+    types = narrowTypes(types, OPEN_API_PRINCIPAL);
+    if (types.length === 0) {
+      return c.json(
+        { ok: false, error: { code: "FORBIDDEN", message: "该 API Key 无权查询所请求的业务范围" } },
+        403,
+      );
+    }
+
     // ── 2. 可选过滤条件 ──
     const technician = c.req.query("technician")?.trim() || undefined;
     const base = c.req.query("base")?.trim() || undefined;
@@ -214,23 +224,9 @@ export function openApiRoute(): Hono {
     const since = c.req.query("since")?.trim() || undefined;
     const until = c.req.query("until")?.trim() || undefined;
 
-    if (since && !DATE_RE.test(since)) {
-      return c.json(
-        { ok: false, error: { code: "INVALID_PARAM", message: `since 格式无效（应为 YYYY-MM-DD）: ${since}` } },
-        400,
-      );
-    }
-    if (until && !DATE_RE.test(until)) {
-      return c.json(
-        { ok: false, error: { code: "INVALID_PARAM", message: `until 格式无效（应为 YYYY-MM-DD）: ${until}` } },
-        400,
-      );
-    }
-    if (since && until && since > until) {
-      return c.json(
-        { ok: false, error: { code: "INVALID_PARAM", message: `since (${since}) 不能晚于 until (${until})` } },
-        400,
-      );
+    const dateError = validateDateRange(since, until);
+    if (dateError) {
+      return c.json({ ok: false, error: { code: "INVALID_PARAM", message: dateError } }, 400);
     }
 
     // ── 3. limit（默认 200，上限 1000） ──

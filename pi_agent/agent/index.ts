@@ -48,11 +48,11 @@ export {
   defaultAgentConfig,
 } from "./config";
 
-// ── Events ─────────────────────────────────────
-export { subscribeToEvents, printEvent } from "./events";
-
 // ── Session ────────────────────────────────────
 export { createSession, resolveModelChain } from "./session";
+
+// ── Turn Runner（一回合的唯一实现） ───────────────
+export { runTurn, type TurnEvent, type TurnResult } from "./turnRunner";
 
 // ── Model Fallback（额度用尽自动降级） ─────────
 export {
@@ -70,10 +70,16 @@ export {
   type UserContext,
   type UserRole,
 } from "./services/userContext";
-export { checkPermission, type PermissionResult } from "./services/permissionGuard";
+export {
+  checkPermission,
+  allowedTypes,
+  narrowTypes,
+  OPEN_API_PRINCIPAL,
+  type PermissionResult,
+} from "./services/access";
 
 // ── Business Scopes（MaxKB 多智能体分流） ──────
-export { SCOPES, resolveScopeByModel, type BusinessScope } from "./scopes";
+export { SCOPES, resolveScopeByModel, type AssistantScope } from "./scopes";
 
 // ── Data Layer（SQL Server 数据层，供 server 开放接口直连） ──
 // 纯查询函数（@param 参数化、只读），不依赖 Agent 框架与 ALS 用户上下文。
@@ -85,8 +91,20 @@ export {
   resolveBusinessTypes,
   ALL_BASE_NAMES,
   DEFAULT_LIST_LIMIT,
+  BUSINESS_SCOPES,
+  scopeOf,
   type BaseName,
+  type BusinessScope,
   type OrderProgressResult,
   type OrderListFilters,
   type OrderListTypeResult,
 } from "./services/sqlServer";
+
+// ── Order Query（工具与开放接口共用的判定层） ──
+export {
+  lookupOrder,
+  validateDateRange,
+  NOT_FOUND_HINT,
+  type OrderLookup,
+  type ScopeError,
+} from "./services/orderQuery";

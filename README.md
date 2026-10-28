@@ -30,6 +30,8 @@ production_agent/
 
 **技术栈**：TypeScript · pi-coding-agent · pi-ai · Hono · Next.js · SQL Server (mssql)
 
+编码规范见 [CODING_STANDARDS.md](CODING_STANDARDS.md)；单次改动的验收标准放 `docs/specs/`。
+
 ## 快速开始
 
 ### 前置条件

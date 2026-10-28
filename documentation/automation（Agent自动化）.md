@@ -5,7 +5,7 @@
 每个聊天会话创建一个 `AgentSession`，配置如下：
 
 - **模型**: 通过 `AI_PROVIDER` + `AI_MODEL` 环境变量配置
-- **系统提示词**: AGENTS.md（角色、能力边界、意图路由、行为准则）+ 3 SKILL.md（order-progress / capacity-analysis / output-format）
+- **系统提示词**: `pi_agent/agent/prompts/persona.md`（角色、能力边界、意图路由、行为准则）+ 3 SKILL.md（order-progress / capacity-analysis / output-format）
 - **思考级别**: `"low"`（reasoning tokens 作为 `thinking_delta` SSE 事件转发）
 - **上下文压缩**: 默认启用（SettingsManager），长对话自动压缩
 
@@ -41,7 +41,7 @@
 
 ### 软护栏（LLM 通过遵循 prompt 来实现）
 
-1. AGENTS.md 中的行为规则（意图路由、超出范围拒绝）
+1. persona.md 中的行为规则（意图路由、超出范围拒绝）
 2. SKILL.md 中的格式化规则（表格格式、emoji 使用、时间格式）
 3. 降级标注：使用 mock 数据时标注"当前基于模拟数据"
 
